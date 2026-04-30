@@ -1,0 +1,28 @@
+# Credentials and secrets — never commit these
+*.env
+.env.*
+secrets.yml
+secrets.json
+credentials.json
+*_credentials.*
+*_secrets.*
+
+# Snowflake connection configs that may contain account/password
+*.snowsql
+connections.toml
+
+# Local data files — too large and may contain PII
+*.csv
+*.txt
+*.zip
+*.xlsx
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

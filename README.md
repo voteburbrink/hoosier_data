@@ -1,8 +1,28 @@
 # hoosier_data
 
-Snowflake data warehouse for Indiana public records. Covers campaign finance, legislative voting, lobbying, state and local government spending, and federal contracts.
+Snowflake data warehouse for Indiana public records. Covers campaign finance, legislative voting, lobbying, state and local government spending, federal contracts, and local government financial data.
 
 Built as shared research infrastructure for Indiana Democratic candidates.
+
+## Dashboards
+
+### Bartholomew County Township Trustee Dashboard
+
+Streamlit in Snowflake app analyzing the fiscal health of all 12 Bartholomew County townships. Core focus: the fiscal impact of **Indiana Senate Enrolled Act 1 (2025)** on township budgets.
+
+**Location:** `dashboards/bartholomew_twp_trustee/app.py`
+
+**Key features:**
+- SEA-1 Impact tab: what the law does, who benefits, who pays (including corporate/BPP tax provisions), county-wide 5-year fiscal projections
+- Trends and Forecast: revenue vs expenditure with policy-aware scenarios; one-time spike detection anchors forecasts to smoothed baselines
+- Spending by Category: disbursement class breakdown (Personal Services, Capital, etc.)
+- YoY Growth: top movers across all townships
+- Township Assistance: admin cost vs dollars delivered, TA-7 application outcome tracking with Harrison Township denial anomaly
+- Data Explorer: raw view of all underlying data
+
+**Harrison Township 2024 anomaly:** A one-time $393K fund transfer inflated 2024 expenditures ~51% above the trailing 3-year average. The `is_end_of_series_spike()` function detects this and anchors the forecast to the smoothed baseline (~$742K) rather than the inflated $1.12M figure.
+
+**SEA-1 context:** Levy growth caps constrain township revenue that historically grew at 5-7%/yr. Fixed costs (salaries, utilities) continue rising with inflation. The cumulative result is a structural deficit that widens each year without service cuts or levy appeals. The law simultaneously extends Business Personal Property exemptions, commercial assessment caps, and data center incentives - each of which permanently reduces the property tax base townships collect from.
 
 ## Data
 
@@ -24,15 +44,61 @@ Built as shared research infrastructure for Indiana Democratic candidates.
 | ECA Expenditures | Indiana Gateway | 4,385,913 | Multi-year |
 | ECA Receipts | Indiana Gateway | 4,223,741 | Multi-year |
 | ECA Balances | Indiana Gateway | 537,161 | Multi-year |
-| Tax Distributions | Indiana Gateway | 1,014,580 | Multi-year |
+| Tax Distributions (Form 22) | Indiana Gateway | 1,014,580 | Multi-year |
 | Entity Funds (federal) | Indiana Gateway | 74,662 | Multi-year |
+| Disbursements Detail (all units) | Indiana Gateway | ~Bartholomew | 2011-2024 |
+| Receipts Detail (all units) | Indiana Gateway | ~Bartholomew | 2015-2024 |
+| Certified Net Assessed Value | Indiana Gateway | ~Bartholomew | 2016-2024 |
+| Township Assistance TA-7 | Indiana Gateway | ~Bartholomew | 2011-2025 |
 | Federal Contracts | USASpending.gov | 304,116 | FY2020-FY2026 |
 
-43 million rows across 22 tables.
+43M+ rows across 26 tables.
+
+## Repository Structure
+
+```
+sql/
+  raw/
+    create_tables.sql           -- All RAW layer table definitions (all VARCHAR)
+    copy_into.sql               -- Snowflake COPY INTO statements
+  analytics/
+    candidate_research.sql      -- Legislator research queries
+    bartholomew_township_views.sql  -- Township dashboard analytics views
+
+dashboards/
+  bartholomew_twp_trustee/
+    app.py                      -- Streamlit in Snowflake app (full source)
+
+scripts/
+  prepare_gateway_data.ps1      -- Filter/convert Indiana Gateway bulk files
+  download_state_expenditures.ps1
+  filter_indiana_contracts.py
+  organize_gateway_files.ps1
+  split_large_files.ps1
+
+docs/
+  data-dictionary.md
+  data-sources.md
+  scripts.md
+  snowflake-setup.md
+  sql-reference.md
+```
 
 ## Setup
 
 See [docs/snowflake-setup.md](docs/snowflake-setup.md) for Snowflake instance setup and [docs/data-sources.md](docs/data-sources.md) for data download instructions.
+
+## Downloading Gateway Data
+
+Indiana Gateway bulk AFR downloads are statewide (100MB-400MB). Use `scripts/prepare_gateway_data.ps1` to filter to Bartholomew County and convert pipe-delimited files to CSV before uploading to Snowflake.
+
+Files available at: https://gateway.ifionline.org/report_builder/Default3a.aspx?rptType=expenditure
+
+Key files:
+- **Annual Financial Reports > Detailed Disbursements with Departments** - `detailedDisburse_fundswithdept.csv` (pipe-delimited)
+- **Annual Financial Reports > Detailed Receipts** - `detailedReceipts.csv` (pipe-delimited)
+- **Budget Data > Form 22** - `form22.csv` (pipe-delimited)
+- **Budget Data > Certified Net Assessed Value** - `certNav.csv` (comma-delimited)
 
 ## License
 

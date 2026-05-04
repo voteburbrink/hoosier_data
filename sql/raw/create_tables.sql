@@ -464,6 +464,100 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ENTITY_FUNDS (
     sboa_fund_classification   VARCHAR
 );
 
+-- ── INDIANA GATEWAY - EXTENDED DETAIL TABLES (2011+) ─────────────────────────
+-- Downloaded as statewide files, filtered to Bartholomew County, converted to CSV.
+-- Covers all AFR unit types: '7' Township, '5' School Corp, '6' Library, '1' County.
+-- These extend coverage back to 2011 and include department-level coding.
+
+CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_DETAIL (
+    year                 VARCHAR,
+    cnty_cd              VARCHAR,
+    cnty_description     VARCHAR,
+    budget_unit_type     VARCHAR,
+    unit_code            VARCHAR,
+    sboa_id              VARCHAR,
+    afr_unit_type        VARCHAR,
+    unit_name            VARCHAR,
+    ent_id               VARCHAR,
+    ent_name             VARCHAR,
+    fund_code            VARCHAR,
+    unit_fund_number     VARCHAR,
+    fund_name            VARCHAR,
+    department_code      VARCHAR,
+    department_name      VARCHAR,
+    disburse_class_code  VARCHAR,
+    class_name           VARCHAR,
+    disburse_code        VARCHAR,
+    disburse_name        VARCHAR,
+    amount               VARCHAR
+);
+
+CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_DETAIL (
+    year                 VARCHAR,
+    cnty_cd              VARCHAR,
+    cnty_description     VARCHAR,
+    budget_unit_type     VARCHAR,
+    unit_code            VARCHAR,
+    sboa_id              VARCHAR,
+    afr_unit_type        VARCHAR,
+    unit_name            VARCHAR,
+    ent_id               VARCHAR,
+    ent_name             VARCHAR,
+    fund_code            VARCHAR,
+    unit_fund_number     VARCHAR,
+    fund_name            VARCHAR,
+    receipt_class_code   VARCHAR,
+    receipt_class_name   VARCHAR,
+    receipt_code         VARCHAR,
+    section              VARCHAR,
+    other_item_flag      VARCHAR,
+    receipt_name         VARCHAR,
+    amount               VARCHAR
+);
+
+CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM22 (
+    yr_nbr               VARCHAR,
+    county               VARCHAR,
+    county_cd            VARCHAR,
+    unit_type_cd         VARCHAR,
+    unit_cd              VARCHAR,
+    unit_type_desc       VARCHAR,
+    unit                 VARCHAR,
+    entity_cd            VARCHAR,
+    entity               VARCHAR,
+    distribution_cd      VARCHAR,
+    distrib_type         VARCHAR,
+    distribution_date    VARCHAR,
+    advance              VARCHAR,
+    warrant              VARCHAR,
+    amt                  VARCHAR,
+    distribution_month   VARCHAR
+);
+
+-- Certified Net Assessed Value by tax district (comma-delimited source, unlike other Gateway files)
+CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CERT_NAV (
+    year                 VARCHAR,
+    county_cd            VARCHAR,
+    county_name          VARCHAR,
+    district_cd          VARCHAR,
+    district_name        VARCHAR,
+    unit_type_cd         VARCHAR,
+    unit_type_desc       VARCHAR,
+    unit_cd              VARCHAR,
+    unit_name            VARCHAR,
+    homestead_nav        VARCHAR,
+    rental_nav           VARCHAR,
+    commercial_nav       VARCHAR,
+    industrial_nav       VARCHAR,
+    ag_nav               VARCHAR,
+    other_nav            VARCHAR,
+    bpp_nav              VARCHAR,
+    total_nav            VARCHAR,
+    prior_nav            VARCHAR,
+    nav_change           VARCHAR,
+    nav_change_pct       VARCHAR
+);
+
 -- ── FEDERAL CONTRACTS (297 columns, all states — filtered to Indiana) ──
 
 CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.FEDERAL_CONTRACTS (

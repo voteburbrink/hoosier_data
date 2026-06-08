@@ -8,7 +8,6 @@ All data is from public government sources. Download instructions and direct lin
 
 **Source**: Indiana Election Division
 **URL**: https://campaignfinance.in.gov/PublicSite/Reporting/DataDownload.aspx
-**Bulk downloads**: https://publicaccountability.org/datasets/35/in_contribs/
 **Coverage**: 2018-2026
 **Format**: CSV, comma-delimited, double-quote enclosed
 **Snowflake table**: `HOOSIER_DATA.RAW.CAMPAIGN_FINANCE_SOURCE`
@@ -63,22 +62,46 @@ Convert XLSX to CSV using the inline conversion block in `docs/scripts.md` befor
 
 **Source**: Indiana Gateway for Government Units
 **URL**: https://gateway.ifionline.org/public/download.aspx
-**Coverage**: 2020-2025
-**Format**: Pipe-delimited TXT
-**Snowflake tables**: Multiple `GATEWAY_*` tables
+**Format**: Pipe-delimited TXT (except certNav which is comma-delimited)
+
+### Statewide Bulk Tables
+
+Upload directly to `GATEWAY_STAGE` (no filtering required). Files over 250MB must be split using `scripts/split_large_files.ps1`.
 
 | File | Table | Description |
 |---|---|---|
-| detailedDisburse_fundsNOdept_YYYY.txt | GATEWAY_DISBURSEMENTS | Local govt disbursements by fund |
-| detailedReceipts_YYYY.txt | GATEWAY_RECEIPTS | Local govt detailed receipts |
-| townshipDisburseByVendor_YYYY.txt | GATEWAY_TOWNSHIP_VENDOR | Township payments by vendor |
+| detailedDisburse_fundsNOdept_YYYY.txt | GATEWAY_DISBURSEMENTS | Local govt disbursements by fund (year files 2020-2025) |
+| detailedDisburse_fundsNOdept_part*.txt | GATEWAY_DISBURSEMENTS_LEGACY | Local govt disbursements (legacy bulk, pre-2020) |
+| detailedReceipts_YYYY.txt | GATEWAY_RECEIPTS | Local govt detailed receipts (year files 2021-2025) |
+| detailedReceipts_part*.txt | GATEWAY_RECEIPTS_LEGACY | Local govt receipts (legacy bulk) |
+| townshipDisburseByVendor_YYYY.txt | GATEWAY_TOWNSHIP_VENDOR | Township payments by vendor (year files 2020-2025) |
+| townshipDisburseByVendor.txt | GATEWAY_TOWNSHIP_VENDOR_LEGACY | Township vendor payments (legacy bulk) |
 | eca_fund_expenditures.txt | GATEWAY_ECA_EXPENDITURES | School extra-curricular spending |
 | eca_fund_receipts.txt | GATEWAY_ECA_RECEIPTS | School extra-curricular receipts |
 | eca_fund_balances.txt | GATEWAY_ECA_BALANCES | School fund balances |
 | form22.txt | GATEWAY_TAX_DISTRIBUTIONS | Property tax distributions |
 | e1_entity_funds.txt | GATEWAY_ENTITY_FUNDS | Federal funds to local entities |
+| afr_CapAssets.txt | GATEWAY_CAP_ASSETS | Capital assets reporting |
+| form4a.txt | GATEWAY_FORM4A | Budget estimates |
+| form4b.txt | GATEWAY_FORM4B | Budget adopted |
+| detailedRevenue.txt | GATEWAY_DETAILED_REVENUE | Detailed revenue by fund |
+| Grants.txt | GATEWAY_GRANTS | Grant receipts |
+| nonGovEntities.txt | GATEWAY_NONGOV_ENTITIES | Non-governmental entity filings |
+| CashInvCombined.txt | GATEWAY_CASH_INV_COMBINED | Cash and investments combined |
+| TA7.txt | GATEWAY_TA7 | Township assistance applications |
 
-Note: Files over 250MB must be split before uploading. Use `scripts/split_large_files.ps1`.
+### Bartholomew-Filtered Detail Tables
+
+Run `scripts/prepare_gateway_data.ps1` to filter statewide files to Bartholomew County rows and convert pipe-delimited format to CSV before uploading.
+
+| Source file | Output CSV | Table |
+|---|---|---|
+| detailedDisburse_fundswithdept.txt | detailedDisburse_fundswithdept.csv | GATEWAY_DISBURSEMENTS_DETAIL |
+| detailedReceipts.txt | detailedReceipts.csv | GATEWAY_RECEIPTS_DETAIL |
+| form22.txt | form22.csv | GATEWAY_FORM22 |
+| certNav.txt | certNav.csv | GATEWAY_CERT_NAV |
+
+**certNav schema note**: Indiana Gateway changed the certNav column structure in 2024. The old schema (homestead/rental/commercial NAV breakdown) was replaced with AV-by-tax-classification (1%/2%/3%) plus TIF components. The current `GATEWAY_CERT_NAV` DDL reflects the new 20-column schema.
 
 ---
 
@@ -97,10 +120,9 @@ Note: Files over 250MB must be split before uploading. Use `scripts/split_large_
 
 **Source**: Indiana Data Hub (Indiana Transparency Portal)
 **URL**: https://hub.mph.in.gov/dataset/vendors-data
-**Coverage**: FY2018 Q1 - FY2026 Q2
+**Coverage**: FY2015 Q1 - FY2026 Q3
 **Format**: CSV, comma-delimited
 **Snowflake table**: `HOOSIER_DATA.RAW.VENDOR_EXPENDITURES`
-**Download script**: `scripts/download_indiana_vendor_data.ps1`
 
 Note: Vendor CSV columns load out of order relative to the RAW table definition. The mapping is corrected in `HOOSIER_DATA.STAGING.VENDOR_EXPENDITURES`. See `docs/snowflake-setup.md` Step 6.
 
@@ -111,7 +133,7 @@ Note: Vendor CSV columns load out of order relative to the RAW table definition.
 **Source**: USASpending.gov
 **URL**: https://www.usaspending.gov/download_center/award_data_archive
 **Coverage**: FY2020-FY2026
-**Format**: CSV (297 columns, all 50 states -- filter to Indiana before loading)
+**Format**: CSV (297 columns, all 50 states — filter to Indiana before loading)
 **Snowflake table**: `HOOSIER_DATA.RAW.FEDERAL_CONTRACTS`
 
 Download instructions:

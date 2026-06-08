@@ -40,7 +40,7 @@ function Convert-PipeToCSV {
 
     $headerLine = $reader.ReadLine()
     if ($null -ne $headerLine) {
-        $csvHeader = $headerLine.Replace('"|"', '","').TrimStart('"').TrimEnd('"')
+        $csvHeader = $headerLine.Replace('"|"', '","')
         $writer.WriteLine($csvHeader)
     }
 
@@ -51,7 +51,7 @@ function Convert-PipeToCSV {
         $line = $reader.ReadLine()
         $total++
         if ($line -like "*$FilterString*") {
-            $csvLine = $line.Replace('"|"', '","').TrimStart('"').TrimEnd('"')
+            $csvLine = $line.Replace('"|"', '","')
             $writer.WriteLine($csvLine)
             $kept++
         }
@@ -98,15 +98,15 @@ Write-Host "Output: $OutputDir"
 Write-Host ""
 
 $files = @(
-    @{ Name = "detailedDisburse_fundswithdept.csv"; Pipe = $true  },
-    @{ Name = "detailedReceipts.csv";                Pipe = $true  },
-    @{ Name = "form22.csv";                          Pipe = $true  },
-    @{ Name = "certNav.csv";                         Pipe = $false }
+    @{ Src = "detailedDisburse_fundswithdept.txt"; Dst = "detailedDisburse_fundswithdept.csv"; Pipe = $true  },
+    @{ Src = "detailedReceipts.txt";                Dst = "detailedReceipts.csv";                Pipe = $true  },
+    @{ Src = "form22.txt";                          Dst = "form22.csv";                          Pipe = $true  },
+    @{ Src = "certNav.txt";                         Dst = "certNav.csv";                         Pipe = $false }
 )
 
 foreach ($f in $files) {
-    $inPath  = Join-Path $InputDir $f.Name
-    $outPath = Join-Path $OutputDir $f.Name
+    $inPath  = Join-Path $InputDir $f.Src
+    $outPath = Join-Path $OutputDir $f.Dst
 
     if (-not (Test-Path $inPath)) {
         Write-Warning "Not found, skipping: $inPath"

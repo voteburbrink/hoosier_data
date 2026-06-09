@@ -319,6 +319,53 @@ WHERE cnty_description ILIKE '%Bartholomew%'
   AND afr_unit_type = '7';
 
 
+-- ── CERT_NAV CLEAN VIEW (statewide, deduped) ─────────────────────────────────
+--   Source file contains exact duplicate rows (2-3x per district per year).
+--   SELECT DISTINCT is safe because all duplicates are identical across every column.
+--   Key on (BUDGET_YEAR, TAX_DISTRICT_CODE) — TAX_DISTRICT_NAME drifts across years.
+--   KAN-134.
+
+CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.CERT_NAV_CLEAN AS
+SELECT DISTINCT
+    TRIM(budget_year)                                           AS budget_year,
+    TRY_TO_NUMBER(TRIM(budget_year))                           AS budget_year_num,
+    TRIM(county_number)                                        AS county_number,
+    TRIM(cnty_description)                                     AS cnty_description,
+    TRIM(tax_district_code)                                    AS tax_district_code,
+    TRIM(tax_district_name)                                    AS tax_district_name,
+    bank_pp_av,
+    TRY_TO_DECIMAL(bank_pp_av, 18, 0)                          AS bank_pp_av_num,
+    net_av_1pct,
+    TRY_TO_DECIMAL(net_av_1pct, 18, 0)                         AS net_av_1pct_num,
+    net_av_2pct,
+    TRY_TO_DECIMAL(net_av_2pct, 18, 0)                         AS net_av_2pct_num,
+    net_av_3pct,
+    TRY_TO_DECIMAL(net_av_3pct, 18, 0)                         AS net_av_3pct_num,
+    real_est_net_av,
+    TRY_TO_DECIMAL(real_est_net_av, 18, 0)                     AS real_est_net_av_num,
+    bus_pp_net_av,
+    TRY_TO_DECIMAL(bus_pp_net_av, 18, 0)                       AS bus_pp_net_av_num,
+    utility_pp_net_av,
+    TRY_TO_DECIMAL(utility_pp_net_av, 18, 0)                   AS utility_pp_net_av_num,
+    rail_pp_net_av,
+    TRY_TO_DECIMAL(rail_pp_net_av, 18, 0)                      AS rail_pp_net_av_num,
+    pp_net_av,
+    TRY_TO_DECIMAL(pp_net_av, 18, 0)                           AS pp_net_av_num,
+    av_tif_real_est,
+    TRY_TO_DECIMAL(av_tif_real_est, 18, 0)                     AS av_tif_real_est_num,
+    av_tif_pp,
+    TRY_TO_DECIMAL(av_tif_pp, 18, 0)                           AS av_tif_pp_num,
+    av_withholding,
+    TRY_TO_DECIMAL(av_withholding, 18, 0)                      AS av_withholding_num,
+    adjusting_net_av,
+    TRY_TO_DECIMAL(adjusting_net_av, 18, 0)                    AS adjusting_net_av_num,
+    av_tif_released,
+    TRY_TO_DECIMAL(av_tif_released, 18, 0)                     AS av_tif_released_num,
+    av_annex_change,
+    TRY_TO_DECIMAL(av_annex_change, 18, 0)                     AS av_annex_change_num
+FROM HOOSIER_DATA.RAW.GATEWAY_CERT_NAV;
+
+
 -- ── FORM 4B: BUDGET LEVY CLEAN VIEW (statewide) ──────────────────────────────
 --   Trims strings and adds _num casts for all dollar/rate columns.
 --   Created in KAN-135; tracked here per KAN-137.

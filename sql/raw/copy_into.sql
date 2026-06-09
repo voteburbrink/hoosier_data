@@ -204,9 +204,9 @@ FILE_FORMAT = (TYPE='CSV' SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='"'
 ON_ERROR = 'CONTINUE';
 
 -- certNav is comma-delimited at source (no pipe conversion needed)
+-- Statewide file is certNav.txt; certNav.csv in stage is Bartholomew-only legacy — do not use
 COPY INTO HOOSIER_DATA.RAW.GATEWAY_CERT_NAV
-FROM @HOOSIER_DATA.RAW.GATEWAY_STAGE
-PATTERN = '.*certNav.*\.csv'
+FROM @HOOSIER_DATA.RAW.GATEWAY_STAGE/certNav.txt
 FILE_FORMAT = (TYPE='CSV' SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='"'
     NULL_IF=('') ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE)
 ON_ERROR = 'CONTINUE';

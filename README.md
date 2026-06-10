@@ -66,7 +66,7 @@ Views in `HOOSIER_DATA.ANALYTICS` that sit on top of the raw tables:
 
 Parameter table `HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS` holds the phase-in schedule for each mechanism. Homestead and 2%-bucket parameters are estimates pending statutory verification against the enrolled act.
 
-**Township Trustee Dashboard** (`sql/analytics/bartholomew_township_views.sql`): Bartholomew County township financial views for the VFD outreach project.
+**Township Trustee Dashboard** (`sql/analytics/bartholomew_township_views.sql`): Bartholomew County township financial views -- revenue vs expenditure, spending by category, poor relief, TA-7, and LIT rate projections.
 
 ## Repository Structure
 

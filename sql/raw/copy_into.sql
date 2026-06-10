@@ -273,6 +273,18 @@ FILE_FORMAT = (TYPE='CSV' FIELD_DELIMITER='|' SKIP_HEADER=1
     NULL_IF=('') ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE)
 ON_ERROR = 'CONTINUE';
 
+-- ── GATEWAY REAL PROPERTY PARCEL (KAN-128) ───────────────────────────────────
+-- Pre-process: python scripts/parse_gateway_parcel.py PARCEL_003.txt
+-- Output CSVs: parcel_<cnty>_<assess_yr>p<pay_yr>.csv  (one per county per year)
+-- PUT each CSV to GATEWAY_STAGE before running this.
+
+COPY INTO HOOSIER_DATA.RAW.GATEWAY_PARCEL
+FROM @HOOSIER_DATA.RAW.GATEWAY_STAGE
+PATTERN = '.*parcel_\d+_\d{4}p\d{4}.*\.csv'
+FILE_FORMAT = (TYPE='CSV' SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='"'
+    NULL_IF=('') ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE)
+ON_ERROR = 'CONTINUE';
+
 -- ── FEDERAL CONTRACTS ─────────────────────────────────────
 -- Stage: CONTRACTS_STAGE
 -- Files: Indiana-filtered CSVs from INDIANA_CONTRACTS folder

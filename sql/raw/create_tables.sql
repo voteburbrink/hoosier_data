@@ -2,11 +2,17 @@
 -- HOOSIER_DATA RAW Layer Table Definitions
 -- All columns VARCHAR — no type casting in RAW layer
 -- Sources land exactly as downloaded
+--
+-- WARNING: DDL ONLY. Do NOT re-run against a populated database.
+-- All statements use CREATE TABLE IF NOT EXISTS — re-running is
+-- safe but will NOT add new columns to existing tables. Use
+-- ALTER TABLE for schema changes; never drop/recreate to avoid data loss.
+-- (Incident: June 5 2026 — CREATE OR REPLACE wiped ~22M rows across 8 tables)
 -- ============================================================
 
 -- ── CAMPAIGN FINANCE ─────────────────────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.CAMPAIGN_FINANCE_SOURCE (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.CAMPAIGN_FINANCE_SOURCE (
     file_number         VARCHAR,
     committee_type      VARCHAR,
     committee           VARCHAR,
@@ -28,7 +34,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.CAMPAIGN_FINANCE_SOURCE (
 
 -- ── LEGISCAN LEGISLATIVE DATA ─────────────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_BILLS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISCAN_BILLS (
     bill_id           VARCHAR,
     session_id        VARCHAR,
     bill_number       VARCHAR,
@@ -45,7 +51,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_BILLS (
     state_link        VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_PEOPLE (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISCAN_PEOPLE (
     people_id             VARCHAR,
     name                  VARCHAR,
     first_name            VARCHAR,
@@ -66,7 +72,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_PEOPLE (
     committee_id          VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_ROLLCALLS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISCAN_ROLLCALLS (
     bill_id         VARCHAR,
     roll_call_id    VARCHAR,
     date            VARCHAR,
@@ -79,14 +85,14 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_ROLLCALLS (
     total           VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_VOTES (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISCAN_VOTES (
     roll_call_id    VARCHAR,
     people_id       VARCHAR,
     vote            VARCHAR,
     vote_desc       VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_SPONSORS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISCAN_SPONSORS (
     bill_id         VARCHAR,
     people_id       VARCHAR,
     position        VARCHAR
@@ -94,7 +100,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LEGISCAN_SPONSORS (
 
 -- ── LOBBYING ─────────────────────────────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LOBBYING_EMPLOYER (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LOBBYING_EMPLOYER (
     year                                    VARCHAR,
     lobbyist                                VARCHAR,
     terminated                              VARCHAR,
@@ -121,7 +127,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LOBBYING_EMPLOYER (
     grand_totals                            VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LOBBYING_COMPENSATED (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LOBBYING_COMPENSATED (
     year                                    VARCHAR,
     lobbyist                                VARCHAR,
     client                                  VARCHAR,
@@ -155,7 +161,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.LOBBYING_COMPENSATED (
 
 -- ── STATE EXPENDITURES ────────────────────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.STATE_EXPENDITURES (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.STATE_EXPENDITURES (
     account_name         VARCHAR,
     account_id           VARCHAR,
     agency_name          VARCHAR,
@@ -180,7 +186,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.STATE_EXPENDITURES (
 
 -- ── VENDOR EXPENDITURES ───────────────────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.VENDOR_EXPENDITURES (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.VENDOR_EXPENDITURES (
     account_id           VARCHAR,
     account_name         VARCHAR,
     agency_id            VARCHAR,
@@ -206,7 +212,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.VENDOR_EXPENDITURES (
 
 -- ── INDIANA GATEWAY LOCAL GOVERNMENT ─────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS (
     year                 VARCHAR,
     cnty_cd              VARCHAR,
     cnty_description     VARCHAR,
@@ -229,7 +235,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS (
     spare_col            VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_LEGACY (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_LEGACY (
     year                 VARCHAR,
     cnty_description     VARCHAR,
     cnty_cd              VARCHAR,
@@ -249,7 +255,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_LEGACY (
     unit_fund_number     VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_RECEIPTS (
     year                 VARCHAR,
     cnty_cd              VARCHAR,
     cnty_description     VARCHAR,
@@ -275,7 +281,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS (
     spare_col            VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_LEGACY (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_LEGACY (
     year                 VARCHAR,
     cnty_description     VARCHAR,
     cnty_cd              VARCHAR,
@@ -298,7 +304,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_LEGACY (
     unit_fund_number     VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR (
     year                 VARCHAR,
     cnty_description     VARCHAR,
     county_cd_fk         VARCHAR,
@@ -318,7 +324,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR (
     spare_col            VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR_LEGACY (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR_LEGACY (
     year                 VARCHAR,
     cnty_description     VARCHAR,
     county_cd_fk         VARCHAR,
@@ -336,7 +342,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR_LEGACY (
     amount               VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_EXPENDITURES (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_ECA_EXPENDITURES (
     year             VARCHAR,
     cnty_description VARCHAR,
     county_cd_fk     VARCHAR,
@@ -351,7 +357,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_EXPENDITURES (
     amount           VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_RECEIPTS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_ECA_RECEIPTS (
     year             VARCHAR,
     cnty_description VARCHAR,
     county_cd_fk     VARCHAR,
@@ -368,7 +374,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_RECEIPTS (
     submit_status    VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_BALANCES (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_ECA_BALANCES (
     year             VARCHAR,
     cnty_description VARCHAR,
     county_cd_fk     VARCHAR,
@@ -386,7 +392,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_BALANCES (
     submit_status    VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TAX_DISTRIBUTIONS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_TAX_DISTRIBUTIONS (
     yr_nbr              VARCHAR,
     county              VARCHAR,
     county_cd           VARCHAR,
@@ -405,7 +411,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TAX_DISTRIBUTIONS (
     distribution_month  VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ENTITY_FUNDS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_ENTITY_FUNDS (
     year                       VARCHAR,
     entity_id                  VARCHAR,
     unit_id                    VARCHAR,
@@ -469,7 +475,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_ENTITY_FUNDS (
 -- Covers all AFR unit types: '7' Township, '5' School Corp, '6' Library, '1' County.
 -- These extend coverage back to 2011 and include department-level coding.
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_DETAIL (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_DETAIL (
     year                 VARCHAR,
     cnty_cd              VARCHAR,
     cnty_description     VARCHAR,
@@ -492,7 +498,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_DETAIL (
     amount               VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_DETAIL (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_DETAIL (
     year                 VARCHAR,
     cnty_cd              VARCHAR,
     cnty_description     VARCHAR,
@@ -515,7 +521,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_DETAIL (
     amount               VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM22 (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_FORM22 (
     yr_nbr               VARCHAR,
     county               VARCHAR,
     county_cd            VARCHAR,
@@ -537,7 +543,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM22 (
 -- Certified Net Assessed Value by tax district (comma-delimited source, unlike other Gateway files)
 -- Schema updated 2026-06-08: Indiana Gateway changed columns from homestead/rental/commercial breakdown
 -- to AV-by-classification (1%/2%/3%) + TIF components.
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CERT_NAV (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_CERT_NAV (
     budget_year          VARCHAR,
     county_number        VARCHAR,
     cnty_description     VARCHAR,
@@ -562,7 +568,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CERT_NAV (
 
 -- ── FEDERAL CONTRACTS (297 columns, all states — filtered to Indiana) ──
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.FEDERAL_CONTRACTS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.FEDERAL_CONTRACTS (
     contract_transaction_unique_key                                    VARCHAR,
     contract_award_unique_key                                         VARCHAR,
     award_id_piid                                                     VARCHAR,
@@ -864,7 +870,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.FEDERAL_CONTRACTS (
 
 -- ── INDIANA GATEWAY - NEW BULK TABLES (added 2026-06-08) ─────────────────────
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CAP_ASSETS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_CAP_ASSETS (
     year                        VARCHAR,
     cnty_description            VARCHAR,
     cnty_cd                     VARCHAR,
@@ -882,7 +888,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CAP_ASSETS (
     ending_balance              VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM4A (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_FORM4A (
     year                        VARCHAR,
     cnty_description            VARCHAR,
     cnty_cd                     VARCHAR,
@@ -897,7 +903,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM4A (
     amount_approved             VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM4B (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_FORM4B (
     year                                        VARCHAR,
     cnty_description                            VARCHAR,
     cnty_cd                                     VARCHAR,
@@ -951,7 +957,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_FORM4B (
     amt_to_be_raised_taxlevy_adopted            VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_GRANTS (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_GRANTS (
     year                    VARCHAR,
     cnty_description        VARCHAR,
     cnty_cd                 VARCHAR,
@@ -978,7 +984,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_GRANTS (
     insurance               VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_NONGOV_ENTITIES (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_NONGOV_ENTITIES (
     year                VARCHAR,
     cnty_description    VARCHAR,
     county_cd_fk        VARCHAR,
@@ -1002,7 +1008,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_NONGOV_ENTITIES (
     amount              VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TA7 (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_TA7 (
     year                VARCHAR,
     cnty_description    VARCHAR,
     cnty_cd             VARCHAR,
@@ -1072,7 +1078,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_TA7 (
     question25          VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DETAILED_REVENUE (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_DETAILED_REVENUE (
     year                        VARCHAR,
     cnty_description            VARCHAR,
     cnty_cd                     VARCHAR,
@@ -1090,7 +1096,7 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_DETAILED_REVENUE (
     pop2010                     VARCHAR
 );
 
-CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CASH_INV_COMBINED (
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_CASH_INV_COMBINED (
     year                VARCHAR,
     cnty_description    VARCHAR,
     cnty_cd             VARCHAR,
@@ -1108,3 +1114,102 @@ CREATE OR REPLACE TABLE HOOSIER_DATA.RAW.GATEWAY_CASH_INV_COMBINED (
     d_bal               VARCHAR,
     cash_bal            VARCHAR
 );
+
+-- ── DLGF TOWNSHIP CODE REFERENCE ─────────────────────────────────────────────
+-- Source: in.gov/dlgf/files/Townships-by-County.pdf (DLGF Data Analysis Division, May 2023)
+-- 1,002 rows — all Indiana townships with state-assigned township numbers
+-- Joins GATEWAY_PARCEL.township_number to township names statewide
+-- Loader: scripts/load_snowflake_parcel.py (also loads this table)
+
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.DLGF_TOWNSHIP_CODES (
+    county_number    VARCHAR,
+    county_name      VARCHAR,
+    township_number  VARCHAR,
+    township_name    VARCHAR
+);
+
+-- ── GATEWAY REAL PROPERTY PARCEL (KAN-128) ───────────────────────────────────
+-- Source: gateway.ifionline.org → Property Files → Real Property → PARCEL
+-- Format: fixed-width (1,286 bytes/record, 50 IAC 26-20-4)
+-- Parser: scripts/parse_gateway_parcel.py → parcel_<cnty>_<yr>p<yr>.csv
+-- Coverage: 2022p2023 (pre-SEA-1 baseline) + 2024p2025 (current); ~3.5-4M rows/year
+-- Key use: homestead AV share by township for SEA-1 fire fund impact model
+
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.GATEWAY_PARCEL (
+    assessment_year              VARCHAR,  -- injected from HEADER record
+    pay_year                     VARCHAR,  -- injected from HEADER record
+    county_number                VARCHAR,  -- injected from HEADER record
+    county_description           VARCHAR,  -- injected from HEADER record
+    parcel_number                VARCHAR,  -- 1-25
+    local_assessor_parcel        VARCHAR,  -- 26-50
+    township_number              VARCHAR,  -- 51-54; joins to CERT_NAV
+    local_district_number        VARCHAR,  -- 55-57
+    state_district_number        VARCHAR,  -- 58-60
+    property_address             VARCHAR,  -- 94-153
+    property_city                VARCHAR,  -- 154-183
+    property_zip                 VARCHAR,  -- 184-193
+    property_class_code          VARCHAR,  -- 194-196
+    av_total_land                VARCHAR,  -- 469-480
+    av_total_improvements        VARCHAR,  -- 481-492
+    av_total_land_and_impr       VARCHAR,  -- 493-504
+    av_land_1pct                 VARCHAR,  -- 541-552; homestead-eligible land
+    av_impr_1pct                 VARCHAR,  -- 553-564; homestead-eligible improvements
+    av_nonhs_res_land_2pct       VARCHAR,  -- 565-576
+    av_nonhs_res_impr_2pct       VARCHAR,  -- 577-588
+    av_apt_land_2pct             VARCHAR,  -- 589-600
+    av_apt_impr_2pct             VARCHAR,  -- 601-612
+    av_ltc_land_2pct             VARCHAR,  -- 613-624
+    av_ltc_impr_2pct             VARCHAR,  -- 625-636
+    av_farmland_2pct             VARCHAR,  -- 637-648
+    av_mobile_home_land_2pct     VARCHAR,  -- 649-660
+    av_land_3pct                 VARCHAR,  -- 661-672
+    av_impr_3pct                 VARCHAR,  -- 673-684
+    av_classified_land           VARCHAR,  -- 685-696
+    legally_deeded_acreage       VARCHAR,  -- 697-708
+    prior_av_total_land          VARCHAR,  -- 721-732
+    prior_av_total_impr          VARCHAR   -- 733-744
+    -- current_av fields (1251-1286) absent from Gateway-distributed files
+);
+
+-- ============================================================
+-- DATA RETENTION (7-day Time Travel on Standard tier)
+-- Snowflake default is 1 day. Run once after initial load.
+-- Safe to re-run — SET is idempotent.
+-- ============================================================
+
+ALTER TABLE HOOSIER_DATA.RAW.CAMPAIGN_FINANCE_SOURCE         SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LEGISCAN_BILLS                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LEGISCAN_PEOPLE                 SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LEGISCAN_ROLLCALLS              SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LEGISCAN_VOTES                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LEGISCAN_SPONSORS               SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LOBBYING_EMPLOYER               SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LOBBYING_COMPENSATED            SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.STATE_EXPENDITURES              SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.VENDOR_EXPENDITURES             SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.FEDERAL_CONTRACTS               SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS           SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_LEGACY    SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS                SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_LEGACY         SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR         SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_TOWNSHIP_VENDOR_LEGACY  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_EXPENDITURES        SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_RECEIPTS            SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_ECA_BALANCES            SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_TAX_DISTRIBUTIONS       SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_ENTITY_FUNDS            SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_DETAIL    SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_RECEIPTS_DETAIL         SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_FORM22                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_CERT_NAV                SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_CAP_ASSETS              SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_FORM4A                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_FORM4B                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_GRANTS                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_NONGOV_ENTITIES         SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_TA7                     SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_DETAILED_REVENUE        SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_CASH_INV_COMBINED       SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.DLGF_TOWNSHIP_CODES             SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_PARCEL                  SET DATA_RETENTION_TIME_IN_DAYS = 7;

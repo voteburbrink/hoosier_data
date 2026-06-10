@@ -513,3 +513,123 @@ FROM HOOSIER_DATA.RAW.GATEWAY_FORM4B;
 -- ── LIBRARY: REVENUE vs EXPENDITURE ──────────────────────────────────────────
 -- Same pattern as schools but AFR_UNIT_TYPE = '6'
 -- Uncomment and run after verifying library data loaded correctly.
+
+
+-- ── HOMESTEAD AV BY TOWNSHIP (KAN-128) ───────────────────────────────────────
+--   Aggregates GATEWAY_PARCEL to township level.
+--   1% cap fields (av_land_1pct + av_impr_1pct) = homestead-eligible gross AV.
+--   Key for SEA-1 fire fund impact model; join to CERT_NAV on township_number
+--   to layer in levy rates and compute revenue loss projections.
+
+CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.HOMESTEAD_AV_BY_TOWNSHIP AS
+SELECT
+    pay_year,
+    assessment_year,
+    county_number,
+    county_description,
+    township_number,
+    COUNT(*)                                                                AS parcel_count,
+
+    SUM(TRY_TO_NUMBER(av_total_land_and_impr))                              AS gross_av,
+    SUM(TRY_TO_NUMBER(av_land_1pct) + TRY_TO_NUMBER(av_impr_1pct))         AS homestead_gross_av,
+    SUM(TRY_TO_NUMBER(av_nonhs_res_land_2pct)
+        + TRY_TO_NUMBER(av_nonhs_res_impr_2pct))                           AS nonhs_res_av,
+    SUM(TRY_TO_NUMBER(av_apt_land_2pct)
+        + TRY_TO_NUMBER(av_apt_impr_2pct))                                 AS apt_av,
+    SUM(TRY_TO_NUMBER(av_ltc_land_2pct)
+        + TRY_TO_NUMBER(av_ltc_impr_2pct))                                 AS ltc_av,
+    SUM(TRY_TO_NUMBER(av_farmland_2pct))                                    AS farmland_av,
+    SUM(TRY_TO_NUMBER(av_mobile_home_land_2pct))                            AS mobile_home_av,
+    SUM(TRY_TO_NUMBER(av_land_3pct)
+        + TRY_TO_NUMBER(av_impr_3pct))                                     AS commercial_av,
+    SUM(TRY_TO_NUMBER(av_classified_land))                                  AS classified_land_av,
+
+    ROUND(
+        SUM(TRY_TO_NUMBER(av_land_1pct) + TRY_TO_NUMBER(av_impr_1pct))
+        / NULLIF(SUM(TRY_TO_NUMBER(av_total_land_and_impr)), 0)
+    , 4)                                                                    AS homestead_pct
+
+FROM HOOSIER_DATA.RAW.GATEWAY_PARCEL
+GROUP BY 1, 2, 3, 4, 5;
+
+
+-- ── LIT FIRE PROTECTION RATE PROJECTION (KAN-129) ────────────────────────────
+--   Projects revenue at 3 LIT fire rate scenarios per IC 6-3.6-6-2.5.
+--   LIT rates expressed as $/100 of AGI.
+--   Scenarios: $0.025, $0.05, $0.10 per $100 AGI = 0.025%, 0.05%, 0.10%.
+--
+--   METHODOLOGY (corrected per Confluence IK/16547841, 2026-06-09):
+--   County LIT base = $40,298,353 (2025 DLGF certified report — ESTIMATED,
+--   not yet reproduced by warehouse query; see KAN-129 open item).
+--   Each 0.025% fire rate generates ~$806K county-wide.
+--   Revenue is distributed by each township's share of total 2024 fire levy
+--   (not by R138 certified shares, which exclude county/city distributions).
+--
+--   Break-even rate = LIT rate needed to fully replace current fire levy.
+--
+--   PRIOR VERSION ERROR: used township R138 share (~$29.3M base) as proxy,
+--   understating revenue ~10x vs the correct $40.3M base. Fixed here.
+
+CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.LIT_FIRE_RATE_PROJECTION AS
+WITH params AS (
+    SELECT
+        40298353.0 AS county_lit_certified,  -- 2025 DLGF certified; ESTIMATED until KAN-129 loads DOR data
+        0.0125     AS combined_lit_rate,      -- Bartholomew County 2024 combined rate
+        2024       AS levy_year
+),
+fire_fund AS (
+    SELECT
+        TRIM(unit_name)                                                              AS township,
+        year_num,
+        SUM(net_tax_rate_adopted_num * net_assessed_valuation_num / 100)             AS fire_levy_est,
+        SUM(net_assessed_valuation_num)                                              AS fire_nav,
+        MAX(CASE WHEN UPPER(fund_description) LIKE '%FIRE AND E%'
+                 THEN net_tax_rate_adopted_num END)                                  AS ems_fire_rate,
+        MAX(CASE WHEN UPPER(fund_description) LIKE '%CUMULATIVE FIRE%'
+                 THEN net_tax_rate_adopted_num END)                                  AS cum_fire_rate
+    FROM HOOSIER_DATA.ANALYTICS.FORM4B_CLEAN
+    WHERE cnty_description ILIKE '%Bartholomew%'
+      AND unit_type = '2'
+      AND UPPER(fund_description) LIKE '%FIRE%'
+      AND year_num = (SELECT levy_year FROM params)
+    GROUP BY 1, 2
+),
+county_levy_total AS (
+    SELECT SUM(fire_levy_est) AS total_levy FROM fire_fund
+)
+SELECT
+    f.township,
+    f.year_num                                                                       AS year,
+    ROUND(f.fire_nav)                                                                AS fire_fund_nav,
+    ROUND(f.fire_levy_est)                                                           AS fire_levy_est,
+    f.ems_fire_rate                                                                  AS ems_fire_rate_per_100,
+    f.cum_fire_rate                                                                  AS cum_fire_rate_per_100,
+    -- Township's share of county fire levy pool (distribution basis)
+    ROUND(f.fire_levy_est / NULLIF(clt.total_levy, 0) * 100, 4)                     AS fire_levy_share_pct,
+    -- County LIT base (ESTIMATED — external figure, not yet in warehouse)
+    ROUND(p.county_lit_certified)                                                    AS county_lit_certified,
+    ROUND(p.county_lit_certified / p.combined_lit_rate)                              AS est_county_agi,
+    -- LIT fire rate scenarios: revenue distributed by fire-levy share
+    ROUND(p.county_lit_certified / p.combined_lit_rate
+        * 0.00025
+        * f.fire_levy_est / NULLIF(clt.total_levy, 0))                              AS lit_fire_rev_0025_per_100,
+    ROUND(p.county_lit_certified / p.combined_lit_rate
+        * 0.0005
+        * f.fire_levy_est / NULLIF(clt.total_levy, 0))                              AS lit_fire_rev_005_per_100,
+    ROUND(p.county_lit_certified / p.combined_lit_rate
+        * 0.001
+        * f.fire_levy_est / NULLIF(clt.total_levy, 0))                              AS lit_fire_rev_01_per_100,
+    -- Break-even: LIT rate ($/100 AGI) to fully replace this township's fire levy
+    ROUND(
+        f.fire_levy_est
+        / NULLIF(
+            p.county_lit_certified / p.combined_lit_rate
+            * f.fire_levy_est / NULLIF(clt.total_levy, 0)
+          , 0)
+        * 100
+    , 4)                                                                             AS breakeven_lit_rate_per_100,
+    'ESTIMATED'                                                                      AS provenance
+FROM fire_fund f
+CROSS JOIN params p
+CROSS JOIN county_levy_total clt
+ORDER BY f.township;

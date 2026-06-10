@@ -404,3 +404,24 @@ Key columns:
 | type_of_set_aside | Small business set-aside type |
 | action_date_fiscal_year | Federal fiscal year of action |
 | usaspending_permalink | Direct link to award on USASpending.gov |
+
+---
+
+## LEGISLATIVE_DISTRICT_XWALK
+
+Township → Indiana legislative district crosswalk (KAN-158). Current 2021-plan /
+123rd GA districts — the map the SEA-1 (2025) legislators sit in. One row per
+township-district pair; built by `scripts/build_legislative_xwalk.py`.
+
+| Column | Description |
+|---|---|
+| county_number | DLGF alphabetical county number, e.g. `03`; joins `DLGF_TOWNSHIP_CODES` / `GATEWAY_PARCEL` |
+| county_name | County name, e.g. `BARTHOLOMEW COUNTY` |
+| township_number | DLGF township number, e.g. `0004` |
+| township_name | Township name, e.g. `FLATROCK TOWNSHIP` |
+| house_district | Indiana House district, `HD-0NN` format (matches `LEGISCAN_PEOPLE.district`) |
+| senate_district | Indiana Senate district, `SD-0NN` format (matches `LEGISCAN_PEOPLE.district`) |
+| congressional_district | U.S. House district, `CD-0N`; comma-separated when a township straddles a line |
+| is_split | `true`/`false` — township crosses >1 House OR >1 Senate district |
+| precinct_count | Number of precincts backing this township-district pair |
+| data_vintage | Source vintage year, e.g. `2024` |

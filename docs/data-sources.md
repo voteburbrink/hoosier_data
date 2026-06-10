@@ -141,3 +141,37 @@ Download instructions:
 2. Select Contracts, select Indiana, download by fiscal year
 3. Run `scripts/filter_indiana_contracts.py` to extract Indiana-only rows
 4. Upload filtered files to `CONTRACTS_STAGE`
+
+---
+
+## Township → Legislative District Crosswalk (KAN-158)
+
+**Sources** (both public, no account required):
+- **Precincts**: IndianaMap "Voting District Boundaries 2024" (current 123rd GA /
+  2021 redistricting plan, from the IGA + Indiana Election Division). Each
+  precinct carries its House (`h`), Senate (`s`), and Congressional (`c`)
+  district and county FIPS.
+  `https://gisdata.in.gov/server/rest/services/Hosted/Voting_District_Boundaries_2024/FeatureServer/1`
+- **Township polygons**: U.S. Census TIGER/Line 2024 county subdivisions (Indiana
+  civil townships). `https://www2.census.gov/geo/tiger/TIGER2024/COUSUB/tl_2024_18_cousub.zip`
+
+**Snowflake table**: `HOOSIER_DATA.RAW.LEGISLATIVE_DISTRICT_XWALK`
+
+**Method**: Precincts nest within a single House + Senate district and a single
+township by statute (IC 3-11-1.5), so each precinct is assigned to the township
+polygon containing it, then matched to `DLGF_TOWNSHIP_CODES` on (county, name).
+County FIPS ↔ DLGF county_number is deterministic: `fips = 2 * county_number - 1`.
+This gives exact township→district sets with no area-sliver false splits.
+
+Build + load:
+```
+python scripts/build_legislative_xwalk.py   # -> districtdata/legislative_district_xwalk.csv
+python scripts/load_snowflake_xwalk.py       # TRUNCATE + COPY (full-snapshot refresh)
+```
+
+District codes use the `LEGISCAN_PEOPLE.district` format (`HD-059`, `SD-041`) for
+a direct join. **Important**: this reflects the **current** districts the SEA-1
+(2025) legislators sit in — not the pre-2022 map. ~48 precincts in non-DLGF
+subdivisions (consolidated towns e.g. Zionsville, Camp Atterbury, Lake Michigan
+water) have no township_number and are excluded; the builder prints them.
+Validate with `sql/analytics/legislative_xwalk_validate.sql`.

@@ -1128,6 +1128,66 @@ CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.DLGF_TOWNSHIP_CODES (
     township_name    VARCHAR
 );
 
+-- ── DLGF TAX RATE CHART: DISTRICT -> UNIT CROSSWALK (KAN-153) ─────────────────
+-- Source: in.gov/dlgf .../<year>_Certifed_Tax_Rates_by_District_Unit.xlsx
+--   ("Certified Tax Rates by Taxing District and Unit", fund-grain)
+-- Statewide tax-district -> taxing-unit crosswalk + per-fund certified rates —
+-- the connective tissue that maps parcel AV to school corps, libraries, cities,
+-- and counties (not just townships). ~53k rows/pay-year.
+-- unit_type_cd: 1=County 2=Township 3=City/Town 4=School 5=Library 6=Special
+--   (NB: differs from GATEWAY_DISBURSEMENTS afr_unit_type 5=School 6=Library 7=Township)
+-- Loader: scripts/download_dlgf_trc.py + scripts/load_snowflake_trc.py
+-- Consumed by ANALYTICS.DLGF_DISTRICT_UNIT_CLEAN / SEA1_UNIT_AV_BASE / SEA1_*_IMPACT
+
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.DLGF_TAX_DISTRICT_UNITS (
+    budget_year         VARCHAR,  -- YR_NBR (pay year)
+    county_number       VARCHAR,  -- CNTY_CD
+    unit_type_cd        VARCHAR,  -- UNIT_TYPE_CD
+    unit_code           VARCHAR,  -- UNIT_CD
+    unit_name           VARCHAR,  -- UNIT_NAME
+    fund_code           VARCHAR,  -- FUND_CD
+    fund_name           VARCHAR,  -- FUND_LONG_NAME
+    tax_district_code   VARCHAR,  -- TAX_DIST_CD
+    tax_district_name   VARCHAR,  -- TAX_DIST_NAME
+    certd_tax_rate_pct  VARCHAR   -- CERTD_TAX_RATE_PCNT (per $100 AV)
+);
+
+-- ── TOWNSHIP -> LEGISLATIVE DISTRICT CROSSWALK (KAN-158) ─────────────────────
+-- Maps every Indiana civil township to its current (2021-plan / 123rd GA) Indiana
+-- House and Senate district(s), with a split flag for townships that cross a
+-- House or Senate district line.
+--
+-- Source: IndianaMap "Voting District Boundaries 2024" precincts (carry h/s/c
+--   district + county FIPS; sourced from the IGA + Indiana Election Division)
+--   spatially assigned to Census TIGER/Line 2024 county subdivisions (= Indiana
+--   civil townships), then matched to DLGF township_number on (county, name).
+--   Precincts nest within one House + one Senate district by statute (IC 3-11-1.5),
+--   so assignments are exact — no area-sliver false splits.
+-- Builder: scripts/build_legislative_xwalk.py  -> districtdata/legislative_district_xwalk.csv
+-- Loader:  scripts/load_snowflake_xwalk.py
+--
+-- Grain: one row per (county_number, township_number, house_district, senate_district)
+--   that actually occurs in the township. house_district / senate_district use the
+--   LEGISCAN_PEOPLE.district format ('HD-059', 'SD-041') for a direct join.
+-- is_split = 'true' when the township spans >1 House OR >1 Senate district.
+-- congressional_district may list >1 value (comma-separated) where a township
+--   straddles a U.S. House line (does not set is_split).
+-- NOTE: ~48 precincts in non-DLGF subdivisions (consolidated towns e.g. Zionsville,
+--   Camp Atterbury, Lake Michigan water) have no township_number and are excluded.
+
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISLATIVE_DISTRICT_XWALK (
+    county_number          VARCHAR,  -- DLGF alphabetical county number, e.g. '03'
+    county_name            VARCHAR,  -- e.g. 'BARTHOLOMEW COUNTY'
+    township_number        VARCHAR,  -- DLGF township number, e.g. '0004'
+    township_name          VARCHAR,  -- e.g. 'FLATROCK TOWNSHIP'
+    house_district         VARCHAR,  -- 'HD-059' (matches LEGISCAN_PEOPLE.district)
+    senate_district        VARCHAR,  -- 'SD-041'
+    congressional_district VARCHAR,  -- 'CD-06' (or 'CD-06,CD-09' when straddling)
+    is_split               VARCHAR,  -- 'true'/'false' — crosses a House or Senate line
+    precinct_count         VARCHAR,  -- # precincts backing this township-district pair
+    data_vintage           VARCHAR   -- source vintage year, e.g. '2024'
+);
+
 -- ── GATEWAY REAL PROPERTY PARCEL (KAN-128) ───────────────────────────────────
 -- Source: gateway.ifionline.org → Property Files → Real Property → PARCEL
 -- Format: fixed-width (1,286 bytes/record, 50 IAC 26-20-4)
@@ -1213,3 +1273,5 @@ ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_DETAILED_REVENUE        SET DATA_RETENTION_
 ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_CASH_INV_COMBINED       SET DATA_RETENTION_TIME_IN_DAYS = 7;
 ALTER TABLE HOOSIER_DATA.RAW.DLGF_TOWNSHIP_CODES             SET DATA_RETENTION_TIME_IN_DAYS = 7;
 ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_PARCEL                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.DLGF_TAX_DISTRICT_UNITS         SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.LEGISLATIVE_DISTRICT_XWALK      SET DATA_RETENTION_TIME_IN_DAYS = 7;

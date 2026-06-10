@@ -18,6 +18,14 @@ connections.toml
 *.xlsx
 data/
 
+# Local geo source/cache files (KAN-158 crosswalk build — large binaries)
+districtdata/
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+
 # Python
 __pycache__/
 *.pyc

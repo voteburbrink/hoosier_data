@@ -40,35 +40,56 @@ Built as shared research infrastructure for Indiana Democratic candidates.
 | Township Assistance (TA-7) | Indiana Gateway | 15,033 | Multi-year |
 | Disbursements Detail (Bartholomew) | Indiana Gateway | 6,889 | 2011-2024 |
 | Receipts Detail (Bartholomew) | Indiana Gateway | 12,782 | 2015-2024 |
-| Certified Net Assessed Value (Bartholomew) | Indiana Gateway | 387 | 2016-2024 |
+| Certified Net Assessed Value | Indiana Gateway | 31,174 | Statewide, 2016-2025 |
 | Form 22 Detail (Bartholomew) | Indiana Gateway | 6,843 | Multi-year |
+| Real Property Parcel | Indiana Gateway | 7,137,858 | Statewide, 2022p2023 + 2024p2025 |
+| DLGF Township Codes | DLGF | 1,002 | All 92 counties |
 
-44M+ rows across 34 tables.
+51M+ rows across 36 tables.
+
+## Analytics Views
+
+Views in `HOOSIER_DATA.ANALYTICS` that sit on top of the raw tables:
+
+**SEA-1 Fire Fund Impact Model** (`sql/analytics/sea1_impact.sql`): models the revenue loss to township fire departments from Indiana HEA 1001 (2024) property tax reform. Three mechanisms: BPP exemption increase, homestead deduction increases, and phased 2%-cap deduction. Covers all 92 Indiana counties.
+
+| View | Purpose |
+|---|---|
+| `PARCEL_DISTRICT_RATE` | Joins parcel data to tax district rates. Base for all per-parcel models. |
+| `SEA1_BPP_LOSS` | BPP levy loss by township, township-proper districts only |
+| `SEA1_HOMESTEAD_LOSS` | Per-parcel homestead deduction delta by township and phase year 2026-2031 |
+| `SEA1_2PCT_BUCKET_LOSS` | Phased AV deduction for 2%-cap property (third SEA-1 mechanism) |
+| `FIRE_COST_TREND` | Township fire operating CAGR and 2029 projections, with transfer exclusion |
+| `SEA1_FIRE_IMPACT_SUMMARY` | Combined output: loss + cost + net gap, provenance-flagged per column |
+| `FIRE_REVENUE_TREND` | Actual fire fund receipts 2020-2024 by source (property tax, LIT, excise, etc.) |
+| `LIT_FIRE_RATE_PROJECTION` | LIT fire rate revenue scenarios at 0.025/0.05/0.10% AGI |
+
+Parameter table `HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS` holds the phase-in schedule for each mechanism. Homestead and 2%-bucket parameters are estimates pending statutory verification against the enrolled act.
+
+**Township Trustee Dashboard** (`sql/analytics/bartholomew_township_views.sql`): Bartholomew County township financial views for the VFD outreach project.
 
 ## Repository Structure
 
 ```
 sql/
   raw/
-    create_tables.sql           -- All RAW layer table definitions (all VARCHAR)
-    copy_into.sql               -- Snowflake COPY INTO statements
+    create_tables.sql           -- All RAW layer table definitions (CREATE TABLE IF NOT EXISTS)
+    copy_into.sql               -- Snowflake COPY INTO statements for all stages
   analytics/
     candidate_research.sql      -- Legislator research queries
-    bartholomew_township_views.sql  -- Township analytics views
+    bartholomew_township_views.sql  -- Township trustee dashboard views
+    sea1_impact.sql             -- SEA-1 fire fund impact model (statewide)
 
 scripts/
-  prepare_gateway_data.ps1      -- Filter Indiana Gateway bulk files to Bartholomew County
+  download_gateway_parcel.py    -- Download PARCEL files by county from Gateway
+  parse_gateway_parcel.py       -- Parse fixed-width PARCEL records to CSV
+  load_snowflake_parcel.py      -- Stage and COPY INTO GATEWAY_PARCEL
+  verify_parcel_load.py         -- Row count verification after load
+  prepare_gateway_data.ps1      -- Filter Gateway bulk files to Bartholomew County
   download_state_expenditures.ps1
   filter_indiana_contracts.py
   organize_gateway_files.ps1
   split_large_files.ps1
-
-docs/
-  data-dictionary.md
-  data-sources.md
-  scripts.md
-  snowflake-setup.md
-  sql-reference.md
 ```
 
 ## Setup
@@ -81,14 +102,28 @@ Indiana Gateway bulk AFR downloads are statewide. Use `scripts/prepare_gateway_d
 
 Files available at: https://gateway.ifionline.org/public/download.aspx
 
-Bartholomew-filtered detail tables (run through `prepare_gateway_data.ps1`):
-- **Detailed Disbursements with Departments** — `detailedDisburse_fundswithdept.txt` (pipe-delimited)
-- **Detailed Receipts** — `detailedReceipts.txt` (pipe-delimited)
-- **Form 22** — `form22.txt` (pipe-delimited)
-- **Certified Net Assessed Value** — `certNav.txt` (comma-delimited; schema changed 2024 — see data-sources.md)
+**PARCEL files** (real property, fixed-width format):
 
-Statewide bulk files (upload directly to GATEWAY_STAGE):
-- All other `GATEWAY_*` tables load directly from the pipe-delimited `.txt` files. Files over 250MB must be split first using `scripts/split_large_files.ps1`.
+Download per-county PARCEL zip files from Gateway > Property Files > Real Property. Parse with `scripts/parse_gateway_parcel.py` before loading. Two vintages needed: 2022p2023 (pre-SEA-1 baseline) and 2024p2025 (current). Coverage: all 92 counties, roughly 3.5M parcels per year.
+
+**Certified Net Assessed Value** (`certNav.txt`):
+
+Single statewide file, comma-delimited. Schema changed in 2024 from homestead/rental/commercial breakdown to AV-by-cap-class (1%/2%/3%). The statewide file contains exact duplicate rows -- always dedup on (budget_year, county_number, tax_district_code) before aggregating.
+
+**Other statewide bulk files** (upload directly to GATEWAY_STAGE):
+
+All other `GATEWAY_*` tables load from pipe-delimited `.txt` files. Files over 250MB must be split first using `scripts/split_large_files.ps1`.
+
+Bartholomew-filtered detail tables (run through `prepare_gateway_data.ps1`):
+- Detailed Disbursements with Departments -- `detailedDisburse_fundswithdept.txt`
+- Detailed Receipts -- `detailedReceipts.txt`
+- Form 22 -- `form22.txt`
+
+## Notes
+
+- All RAW layer columns are VARCHAR. Casting happens in ANALYTICS views.
+- GATEWAY text fields include embedded double-quotes. Use `REPLACE(field, '"', '')` before casting, or query through the `_CLEAN` views in ANALYTICS.
+- Re-running `create_tables.sql` is safe -- all statements use `CREATE TABLE IF NOT EXISTS`. Schema changes require `ALTER TABLE ADD COLUMN`.
 
 ## License
 

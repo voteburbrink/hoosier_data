@@ -608,6 +608,9 @@ WITH townships AS (
     SELECT DISTINCT
         county_number, county_description, township_number, township_name
     FROM HOOSIER_DATA.ANALYTICS.PARCEL_DISTRICT_RATE
+    -- Exclude parcels in abolished civil townships (absorbed by municipalities;
+    -- no DLGF township code, city fire service, no fire levy).
+    WHERE township_name IS NOT NULL AND township_name != ''
 ),
 phase_years AS (
     SELECT DISTINCT phase_year FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
@@ -803,3 +806,371 @@ SELECT
 FROM combined
 GROUP BY county_description, township, year
 ORDER BY county_description, township, year;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 8. FIRE_COST_TREND_DISTRICT  (KAN-165)
+--    Operating cost CAGR for type-6 fire protection district units.
+--    Mirrors FIRE_COST_TREND but uses budget_unit_type='6'. Only modern Gateway
+--    data available (2020+); no legacy table coverage for districts.
+--    LOW_CONFIDENCE when < 3 clean years or no 2024 actual.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.FIRE_COST_TREND_DISTRICT AS
+WITH operating AS (
+    SELECT
+        YEAR::INTEGER                                              AS year,
+        TRIM(cnty_description)                                     AS county_description,
+        TRIM(unit_code)                                            AS unit_code,
+        TRIM(unit_name)                                            AS unit_name,
+        ROUND(SUM(TRY_TO_DOUBLE(REPLACE(amount, ',', ''))))        AS operating_cost
+    FROM HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS
+    WHERE budget_unit_type = '6'
+      AND (UPPER(unit_name) LIKE '%FIRE%' OR UPPER(unit_name) LIKE '%RESCUE%')
+      AND YEAR::INTEGER BETWEEN 2020 AND 2024
+      -- Scope to operating funds; fire districts use either fire-specific names
+      -- (SPECL FIRE GENERAL) or generic names (General Fund) — filter by exclusion.
+      AND UPPER(fund_name) NOT LIKE '%CUMULATIVE%'
+      AND UPPER(fund_name) NOT LIKE '%RAINY DAY%'
+      AND UPPER(fund_name) NOT LIKE '%DEBT%'
+      AND UPPER(fund_name) NOT LIKE '%CAPITAL%'
+      AND UPPER(fund_name) NOT LIKE '%INVESTMENT%'
+      AND UPPER(fund_name) NOT LIKE '%BUILDING%'
+      AND NOT (
+          UPPER(class_name) = 'OTHER DISBURSEMENTS'
+          AND UPPER(disburse_name) LIKE 'TRANSFER OUT%'
+      )
+    GROUP BY YEAR::INTEGER, TRIM(cnty_description), TRIM(unit_code), TRIM(unit_name)
+),
+series AS (
+    SELECT *, MIN(year) OVER (PARTITION BY county_description, unit_code) AS min_year
+    FROM operating
+    WHERE operating_cost > 0
+),
+cagr_calc AS (
+    SELECT
+        county_description,
+        unit_code,
+        unit_name,
+        COUNT(DISTINCT year)                                                    AS years_of_data,
+        MIN(year)                                                               AS first_year,
+        MAX(year)                                                               AS last_year,
+        MIN(CASE WHEN year = min_year THEN operating_cost END)                  AS first_year_cost,
+        MAX(CASE WHEN year = 2024 THEN operating_cost END)                      AS cost_2024,
+        MEDIAN(operating_cost)                                                  AS median_cost,
+        MAX(CASE WHEN year = 2020 THEN operating_cost END)                      AS cost_2020,
+        MAX(CASE WHEN year = 2021 THEN operating_cost END)                      AS cost_2021,
+        MAX(CASE WHEN year = 2022 THEN operating_cost END)                      AS cost_2022,
+        MAX(CASE WHEN year = 2023 THEN operating_cost END)                      AS cost_2023
+    FROM series
+    GROUP BY county_description, unit_code, unit_name
+)
+SELECT
+    w.county_description,
+    w.unit_code,
+    w.unit_name,
+    w.years_of_data,
+    w.first_year,
+    w.last_year,
+    ROUND(w.first_year_cost)                                                    AS first_year_operating,
+    ROUND(w.cost_2024)                                                          AS cost_2024_operating,
+    ROUND(CASE
+        WHEN w.first_year_cost > 0 AND w.cost_2024 > 0 AND (w.last_year - w.first_year) > 0
+        THEN (POWER(w.cost_2024 / w.first_year_cost, 1.0 / (w.last_year - w.first_year)) - 1) * 100
+        ELSE NULL
+    END, 2)                                                                     AS operating_cagr_pct,
+    w.cost_2020, w.cost_2021, w.cost_2022, w.cost_2023,
+    w.cost_2024                                                                 AS cost_2024_actual,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(
+        CASE WHEN w.first_year_cost > 0 AND w.cost_2024 > 0 AND (w.last_year - w.first_year) > 0
+             THEN POWER(w.cost_2024 / w.first_year_cost, 1.0 / (w.last_year - w.first_year)) - 1
+             ELSE 0 END, 0), 1))                                                AS proj_2025,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(
+        CASE WHEN w.first_year_cost > 0 AND w.cost_2024 > 0 AND (w.last_year - w.first_year) > 0
+             THEN POWER(w.cost_2024 / w.first_year_cost, 1.0 / (w.last_year - w.first_year)) - 1
+             ELSE 0 END, 0), 2))                                                AS proj_2026,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(
+        CASE WHEN w.first_year_cost > 0 AND w.cost_2024 > 0 AND (w.last_year - w.first_year) > 0
+             THEN POWER(w.cost_2024 / w.first_year_cost, 1.0 / (w.last_year - w.first_year)) - 1
+             ELSE 0 END, 0), 3))                                                AS proj_2027,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(
+        CASE WHEN w.first_year_cost > 0 AND w.cost_2024 > 0 AND (w.last_year - w.first_year) > 0
+             THEN POWER(w.cost_2024 / w.first_year_cost, 1.0 / (w.last_year - w.first_year)) - 1
+             ELSE 0 END, 0), 4))                                                AS proj_2028,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(
+        CASE WHEN w.first_year_cost > 0 AND w.cost_2024 > 0 AND (w.last_year - w.first_year) > 0
+             THEN POWER(w.cost_2024 / w.first_year_cost, 1.0 / (w.last_year - w.first_year)) - 1
+             ELSE 0 END, 0), 5))                                                AS proj_2029,
+    CASE
+        WHEN w.years_of_data < 3     THEN 'LOW_CONFIDENCE — fewer than 3 years'
+        WHEN w.cost_2024 IS NULL     THEN 'LOW_CONFIDENCE — no 2024 actual'
+        ELSE 'OK'
+    END                                                                         AS confidence_flag
+FROM cagr_calc w
+ORDER BY county_description, unit_name;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 9. SEA1_FIRE_DISTRICT_IMPACT  (KAN-165)
+--    Impact summary for type-6 fire protection district units, mirroring
+--    SEA1_FIRE_IMPACT_SUMMARY. Grain: unit × phase_year.
+--
+--    Rate source: DLGF_TAX_DISTRICT_UNITS (budget_year 2025, unit_type_cd='6',
+--      fire fund codes). Sum of all fire levy funds (general + cumulative +
+--      debt) per (unit, tax_district); rainy day (0061) excluded.
+--    BPP loss: CERT_NAV BPP AV × rate per tax district, summed to unit level.
+--    Homestead/2%-bucket loss: GATEWAY_PARCEL parcels joined to unit territory
+--      via state_district_number → tax_district_code, then deduction formula.
+--    Levy baseline: rate × (real_est + BPP AV) per tax district, summed.
+--    Cost trend: FIRE_COST_TREND_DISTRICT (2020-2024 only; no legacy data).
+--
+--    DLGF creates a separate tax_district_code per (fire district, township area)
+--    so one parcel maps to at most one fire district — no double-count risk.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.SEA1_FIRE_DISTRICT_IMPACT AS
+WITH
+-- Fire rates: sum all fire levy funds per (county, unit, tax_district)
+district_rates AS (
+    SELECT
+        county_number,
+        unit_code,
+        UPPER(TRIM(unit_name))                          AS unit_name,
+        tax_district_code,
+        SUM(TRY_TO_DOUBLE(certd_tax_rate_pct))          AS fire_rate_per_100
+    FROM HOOSIER_DATA.RAW.DLGF_TAX_DISTRICT_UNITS
+    WHERE budget_year = '2025'
+      AND unit_type_cd = '6'
+      -- Match on fund_name OR unit_name: some districts use fire-specific fund
+      -- names (SPECL FIRE GENERAL), others use generic (General Fund).
+      AND (UPPER(fund_name) LIKE '%FIRE%'
+           OR UPPER(unit_name) LIKE '%FIRE%'
+           OR UPPER(unit_name) LIKE '%RESCUE%')
+      AND fund_code != '0061'
+      AND TRY_TO_DOUBLE(certd_tax_rate_pct) > 0
+    GROUP BY county_number, unit_code, unit_name, tax_district_code
+),
+-- CERT_NAV deduped (same pattern as existing views)
+cert_nav AS (
+    SELECT
+        TRIM(budget_year)                       AS budget_year,
+        TRIM(county_number)                     AS county_number,
+        TRIM(tax_district_code)                 AS tax_district_code,
+        TRY_TO_DECIMAL(bus_pp_net_av, 18, 0)    AS bus_pp_net_av,
+        TRY_TO_DECIMAL(real_est_net_av, 18, 0)  AS real_est_net_av
+    FROM HOOSIER_DATA.RAW.GATEWAY_CERT_NAV
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY TRIM(budget_year), TRIM(county_number), TRIM(tax_district_code)
+        ORDER BY TRIM(tax_district_name)
+    ) = 1
+),
+-- BPP loss per district unit
+district_bpp AS (
+    SELECT
+        dr.county_number,
+        dr.unit_code,
+        ROUND(SUM(COALESCE(cn.bus_pp_net_av, 0)))                                       AS total_bpp_nav,
+        ROUND(SUM(COALESCE(cn.bus_pp_net_av, 0) * dr.fire_rate_per_100 / 100), 2)      AS bpp_annual_loss
+    FROM district_rates dr
+    LEFT JOIN cert_nav cn
+        ON dr.county_number = cn.county_number
+        AND dr.tax_district_code = cn.tax_district_code
+        AND cn.budget_year = '2025'
+    GROUP BY dr.county_number, dr.unit_code
+),
+-- Baseline levy per district unit: rate × (real_est + BPP) AV per tax_district
+district_levy AS (
+    SELECT
+        dr.county_number,
+        dr.unit_code,
+        ROUND(SUM(
+            (COALESCE(cn.real_est_net_av, 0) + COALESCE(cn.bus_pp_net_av, 0))
+            * dr.fire_rate_per_100 / 100
+        ))                                                                              AS fire_levy_2025
+    FROM district_rates dr
+    LEFT JOIN cert_nav cn
+        ON dr.county_number = cn.county_number
+        AND dr.tax_district_code = cn.tax_district_code
+        AND cn.budget_year = '2025'
+    GROUP BY dr.county_number, dr.unit_code
+),
+-- Parcel AV within each district's territory (one row per parcel × unit)
+district_parcel AS (
+    SELECT
+        dr.county_number,
+        dr.unit_code,
+        dr.fire_rate_per_100,
+        COALESCE(TRY_TO_NUMBER(p.av_land_1pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_impr_1pct), 0)              AS homestead_av,
+        COALESCE(TRY_TO_NUMBER(p.av_nonhs_res_land_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_nonhs_res_impr_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_apt_land_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_apt_impr_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_ltc_land_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_ltc_impr_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_farmland_2pct), 0)
+            + COALESCE(TRY_TO_NUMBER(p.av_mobile_home_land_2pct), 0)  AS two_pct_av
+    FROM HOOSIER_DATA.RAW.GATEWAY_PARCEL p
+    JOIN district_rates dr
+        ON TRIM(p.county_number) = dr.county_number
+        AND LPAD(TRIM(p.state_district_number), 3, '0') = dr.tax_district_code
+    WHERE p.pay_year = '2025'
+),
+-- Homestead deduction parameters (reuse from SEA1_DEDUCTION_PARAMS)
+hs_params AS (
+    SELECT
+        phase_year,
+        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN param_value END) AS std_ded_cap_new,
+        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN old_law_value END) AS std_ded_cap_old,
+        MAX(CASE WHEN param_name = 'STD_DED_PCT'     THEN param_value END) AS std_ded_pct,
+        MAX(CASE WHEN param_name = 'SUPP_RATE_TIER1' THEN param_value END) AS supp_r1,
+        MAX(CASE WHEN param_name = 'SUPP_THRESHOLD'  THEN param_value END) AS supp_thresh,
+        MAX(CASE WHEN param_name = 'SUPP_RATE_TIER2' THEN param_value END) AS supp_r2,
+        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN verified END)    AS params_verified
+    FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
+    WHERE mechanism = 'HOMESTEAD'
+    GROUP BY phase_year
+),
+bkt_params AS (
+    SELECT phase_year, param_value AS bucket_ded_pct, verified AS params_verified
+    FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
+    WHERE mechanism = '2PCT_BUCKET' AND param_name = 'BUCKET_DED_PCT'
+),
+-- Homestead loss per district × phase_year
+district_homestead AS (
+    SELECT
+        dp.county_number,
+        dp.unit_code,
+        pr.phase_year,
+        COUNT(*)                                                                AS homestead_parcel_count,
+        ROUND(SUM(
+            (LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_new)
+                - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_old)
+            + pr.supp_r1 * LEAST(GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_new), 0), pr.supp_thresh)
+            + pr.supp_r2 * GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_new) - pr.supp_thresh, 0)
+            - pr.supp_r1 * LEAST(GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_old), 0), pr.supp_thresh)
+            - pr.supp_r2 * GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_old) - pr.supp_thresh, 0)
+            ) * dp.fire_rate_per_100 / 100
+        ), 2)                                                                   AS homestead_fire_loss,
+        CASE WHEN pr.params_verified THEN 'VERIFIED' ELSE 'ESTIMATED' END      AS hs_provenance
+    FROM district_parcel dp
+    CROSS JOIN hs_params pr
+    WHERE dp.homestead_av > 0
+    GROUP BY dp.county_number, dp.unit_code, pr.phase_year, pr.params_verified
+),
+-- 2%-bucket loss per district × phase_year
+district_two_pct AS (
+    SELECT
+        dp.county_number,
+        dp.unit_code,
+        bp.phase_year,
+        ROUND(SUM(dp.two_pct_av * bp.bucket_ded_pct * dp.fire_rate_per_100 / 100), 2) AS two_pct_fire_loss,
+        CASE WHEN bp.params_verified THEN 'VERIFIED' ELSE 'ESTIMATED' END              AS two_pct_provenance
+    FROM district_parcel dp
+    CROSS JOIN bkt_params bp
+    WHERE dp.two_pct_av > 0
+    GROUP BY dp.county_number, dp.unit_code, bp.phase_year, bp.params_verified
+),
+phase_years AS (
+    SELECT DISTINCT phase_year FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
+    WHERE phase_year BETWEEN 2026 AND 2031
+),
+districts AS (
+    SELECT DISTINCT county_number, unit_code, unit_name FROM district_rates
+)
+SELECT
+    d.county_number,
+    d.unit_code,
+    d.unit_name,
+    py.phase_year,
+    ROUND(lv.fire_levy_2025)                                                    AS fire_levy_2025,
+    ROUND(b.bpp_annual_loss)                                                    AS bpp_loss,
+    'VERIFIED'                                                                  AS bpp_provenance,
+    ROUND(h.homestead_fire_loss)                                                AS homestead_loss,
+    COALESCE(h.hs_provenance, 'ESTIMATED')                                      AS homestead_provenance,
+    ROUND(tp.two_pct_fire_loss)                                                 AS two_pct_loss,
+    COALESCE(tp.two_pct_provenance, 'ESTIMATED')                                AS two_pct_provenance,
+    ROUND(COALESCE(b.bpp_annual_loss, 0)
+        + COALESCE(h.homestead_fire_loss, 0)
+        + COALESCE(tp.two_pct_fire_loss, 0))                                    AS total_sea1_loss,
+    CASE py.phase_year
+        WHEN 2026 THEN ct.proj_2026
+        WHEN 2027 THEN ct.proj_2027
+        WHEN 2028 THEN ct.proj_2028
+        WHEN 2029 THEN ct.proj_2029
+        ELSE NULL
+    END                                                                         AS projected_operating_cost,
+    ROUND(ct.operating_cagr_pct, 2)                                             AS operating_cagr_pct,
+    ct.confidence_flag                                                          AS cost_confidence,
+    h.homestead_parcel_count,
+    b.total_bpp_nav
+FROM districts d
+CROSS JOIN phase_years py
+LEFT JOIN district_bpp b
+    ON b.county_number = d.county_number AND b.unit_code = d.unit_code
+LEFT JOIN district_levy lv
+    ON lv.county_number = d.county_number AND lv.unit_code = d.unit_code
+LEFT JOIN district_homestead h
+    ON h.county_number = d.county_number AND h.unit_code = d.unit_code
+    AND h.phase_year = py.phase_year
+LEFT JOIN district_two_pct tp
+    ON tp.county_number = d.county_number AND tp.unit_code = d.unit_code
+    AND tp.phase_year = py.phase_year
+LEFT JOIN HOOSIER_DATA.ANALYTICS.FIRE_COST_TREND_DISTRICT ct
+    ON ct.unit_code = d.unit_code AND ct.county_description = (
+        SELECT MAX(cnty_description)
+        FROM HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS
+        WHERE TRIM(unit_code) = d.unit_code AND budget_unit_type = '6'
+    )
+ORDER BY d.county_number, d.unit_name, py.phase_year;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 10. COUNTY_FIRE_SERVICE_STRUCTURE  (KAN-165)
+--     Classifies each Indiana county by how fire service is organized:
+--       township_only  — township fire funds, no type-6 special units with levies
+--       district_only  — type-6 special units only, no township fire levy (e.g. Crawford)
+--       mixed          — both township fire funds and type-6 districts (e.g. Johnson)
+--     Used by packet templates to branch the "shall" vs "may" framing under
+--     IC 6-3.6-6-4.3 (districts = mandatory recipient) vs IC 6-3.6-6-4.5
+--     (township VFDs = trustee-resolution path).
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.COUNTY_FIRE_SERVICE_STRUCTURE AS
+WITH twp_counties AS (
+    SELECT DISTINCT TRIM(cnty_cd) AS county_number
+    FROM HOOSIER_DATA.ANALYTICS.FORM4B_CLEAN
+    WHERE unit_type = '2'
+      AND UPPER(fund_description) LIKE '%FIRE%'
+      AND year_num = 2024
+      AND net_tax_rate_adopted_num > 0
+),
+dist_counties AS (
+    -- Type-6 fire/rescue units with a certified levy. Identify by unit_name
+    -- (authoritative) rather than fund_name (varies: fire-specific vs generic).
+    SELECT DISTINCT county_number
+    FROM HOOSIER_DATA.RAW.DLGF_TAX_DISTRICT_UNITS
+    WHERE budget_year = '2025'
+      AND unit_type_cd = '6'
+      AND (UPPER(unit_name) LIKE '%FIRE%' OR UPPER(unit_name) LIKE '%RESCUE%')
+      AND TRY_TO_DOUBLE(certd_tax_rate_pct) > 0
+),
+all_counties AS (
+    SELECT county_number FROM twp_counties
+    UNION
+    SELECT county_number FROM dist_counties
+)
+SELECT
+    ac.county_number,
+    CASE
+        WHEN t.county_number IS NOT NULL AND d.county_number IS NOT NULL THEN 'mixed'
+        WHEN t.county_number IS NOT NULL                                  THEN 'township_only'
+        WHEN d.county_number IS NOT NULL                                  THEN 'district_only'
+        ELSE 'unknown'
+    END AS fire_service_structure,
+    CASE WHEN d.county_number IS NOT NULL THEN 'TRUE' ELSE 'FALSE' END   AS has_mandatory_recipients,
+    CASE WHEN t.county_number IS NOT NULL THEN 'TRUE' ELSE 'FALSE' END   AS has_discretionary_recipients
+FROM all_counties ac
+LEFT JOIN twp_counties t ON t.county_number = ac.county_number
+LEFT JOIN dist_counties d ON d.county_number = ac.county_number
+ORDER BY ac.county_number;

@@ -79,7 +79,9 @@ def create_table(cursor):
             subdivision_type  VARCHAR,
             population_2020   NUMBER,
             land_sqmi         FLOAT,
-            data_vintage      VARCHAR
+            data_vintage      VARCHAR,
+            county_number     VARCHAR,
+            township_number   VARCHAR
         )
     """ % TABLE)
     print("  Done.\n")

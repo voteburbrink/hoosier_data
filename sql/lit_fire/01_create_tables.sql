@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.TOWNSHIP_POP_AREA (
     subdivision_type  VARCHAR,
     population_2020   NUMBER,
     land_sqmi         FLOAT,
-    data_vintage      VARCHAR
+    data_vintage      VARCHAR,
+    county_number     VARCHAR,  -- DLGF county_number (KAN-164)
+    township_number   VARCHAR   -- DLGF township_number (KAN-164)
 );
 
 -- KAN-129 input: verified county LIT base from the DLGF Certified LIT Report.
@@ -40,10 +42,15 @@ CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.DLGF_LIT_CERTIFIED (
 -- share the pool too and dilute each township's slice. This view models the
 -- township-VFD allocation; refine the denominator when recipient rosters
 -- are loaded.
+-- KAN-164: county_number + township_number exposed so downstream joins use
+-- DLGF codes, never township name strings (which silently drop on DLGF/Census
+-- spelling mismatches like "HAWCREEK TOWNSHIP" vs "Haw Creek township").
 CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.LIT_FIRE_RATE_VERIFIED AS
 WITH twp AS (
     SELECT UPPER(county_name) AS county_u,
            county_name,
+           county_number,
+           township_number,
            township_name,
            population_2020,
            land_sqmi,
@@ -64,7 +71,9 @@ lit AS (
                AS county_agi_base
     FROM HOOSIER_DATA.RAW.DLGF_LIT_CERTIFIED
 )
-SELECT t.county_name,
+SELECT t.county_number,
+       t.township_number,
+       t.county_name,
        t.township_name,
        t.population_2020,
        t.land_sqmi,

@@ -1188,6 +1188,30 @@ CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.LEGISLATIVE_DISTRICT_XWALK (
     data_vintage           VARCHAR   -- source vintage year, e.g. '2024'
 );
 
+-- ── CENSUS TOWNSHIP POPULATION + AREA (KAN-159 / KAN-164) ───────────────────
+-- Source: US Census 2020 P.L. 94-171 population + 2023 Gazetteer land area
+--   joined to DLGF township codes so downstream joins never use name strings.
+-- Builder: scripts/build_township_pop_area.py -> censusdata/township_pop_area.csv
+-- Loader:  scripts/load_snowflake_township_pop_area.py (TRUNCATE + COPY)
+-- KAN-164: county_number / township_number added to eliminate DLGF name-mismatch
+--   silent drops (e.g. "HAWCREEK TOWNSHIP" vs Census "Haw Creek township").
+
+CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.TOWNSHIP_POP_AREA (
+    geoid            VARCHAR,  -- 10-digit Census GEOID (state+county+cousub)
+    state_fips       VARCHAR,
+    county_fips      VARCHAR,  -- 3-digit county FIPS
+    county_name      VARCHAR,  -- Census county name, e.g. "Bartholomew"
+    cousub_fips      VARCHAR,  -- 5-digit county subdivision FIPS
+    subdivision_name VARCHAR,  -- Census name, e.g. "Haw Creek township"
+    township_name    VARCHAR,  -- subdivision_name minus " township" suffix
+    subdivision_type VARCHAR,  -- 'township', 'city', 'town', 'other'
+    population_2020  VARCHAR,
+    land_sqmi        VARCHAR,
+    data_vintage     VARCHAR,
+    county_number    VARCHAR,  -- DLGF alphabetical county number, e.g. '03'
+    township_number  VARCHAR   -- DLGF township number, e.g. '0005'
+);
+
 -- ── GATEWAY REAL PROPERTY PARCEL (KAN-128) ───────────────────────────────────
 -- Source: gateway.ifionline.org → Property Files → Real Property → PARCEL
 -- Format: fixed-width (1,286 bytes/record, 50 IAC 26-20-4)
@@ -1275,3 +1299,4 @@ ALTER TABLE HOOSIER_DATA.RAW.DLGF_TOWNSHIP_CODES             SET DATA_RETENTION_
 ALTER TABLE HOOSIER_DATA.RAW.GATEWAY_PARCEL                  SET DATA_RETENTION_TIME_IN_DAYS = 7;
 ALTER TABLE HOOSIER_DATA.RAW.DLGF_TAX_DISTRICT_UNITS         SET DATA_RETENTION_TIME_IN_DAYS = 7;
 ALTER TABLE HOOSIER_DATA.RAW.LEGISLATIVE_DISTRICT_XWALK      SET DATA_RETENTION_TIME_IN_DAYS = 7;
+ALTER TABLE HOOSIER_DATA.RAW.TOWNSHIP_POP_AREA               SET DATA_RETENTION_TIME_IN_DAYS = 7;

@@ -10,7 +10,7 @@
 --   BPP_LOSS      ESTIMATED — SEA1_BPP_LOSS uses 2024 FORM4B rates;
 --                 reconcile to 2026 certified rates before citing externally.
 --                 Bartholomew: $72,342 view vs $110,999 verified (35% gap).
---   HOMESTEAD/2PCT ESTIMATED — KAN-138/141 parameters; see sea1_impact.sql.
+--   HOMESTEAD/2PCT VERIFIED (KAN-171 2026-06-12) — IC 6-1.1-12-37/37.5 per SEA 1 s44/s45; IC 6-1.1-12-47 per SEA 1 s52.
 --   GAP RATE      MODELED — cost_2031 is interim (see cost31 CTE note).
 --
 -- cost_2031: reads projected_operating_cost from SEA1_FIRE_IMPACT_SUMMARY at
@@ -18,9 +18,9 @@
 --
 -- Spot-checks (Bartholomew, validated 2026-06-12, query 01c5014a-0105-dd6c-000d-a8fe00517072):
 --   lit_rev_at_cap  = ROUND(county_agi_base * 0.004)  -- $13,340,683 (unchanged)
---   sea1_loss_full_phase within $1 of 656,417 (unchanged)
+--   sea1_loss_full_phase = 383,157 (KAN-171: corrected from 656,417 with wrong homestead params)
 --   binding_township = 'OHIO TOWNSHIP'
---   binding_rate_pct ~0.167 (was 0.402 at cap; changed by KAN-169 municipal exclusion fix)
+--   binding_rate_pct ~0.165 (KAN-171: was 0.167; KAN-169 fixed from 0.402 at cap)
 --   fire_dist_2025_total short of levy table by exactly Clay delta ($57,017);
 --     Clay fund-structure check pending (KAN-169 Section 2e).
 -- NOTE: binding_rate_pct and all per-township req_rate figures require revalidation
@@ -111,7 +111,7 @@ SELECT
     lc.lit_rev_at_cap,
     b.binding_township,
     b.binding_rate_pct,
-    'BPP=ESTIMATED until 2026-rate reconciliation; HOMESTEAD/2PCT=ESTIMATED params; GAP RATE=MODELED'
+    'BPP=ESTIMATED until 2026-rate reconciliation; HOMESTEAD/2PCT=VERIFIED (KAN-171); GAP RATE=MODELED'
         AS provenance_note
 FROM loss lo
 LEFT JOIN binding  b  ON b.county_number  = lo.county_number

@@ -30,6 +30,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 import urllib.request
 import zipfile
@@ -48,6 +49,33 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 OUT_DIR = os.path.join(REPO_ROOT, "censusdata")
 OUT_CSV = os.path.join(OUT_DIR, "township_pop_area.csv")
+DLGF_CSV = os.path.join(REPO_ROOT, "propertydata", "dlgf_township_codes.csv")
+
+
+def twp_key(name: str) -> str:
+    """Normalize township name for DLGF-to-Census matching."""
+    k = name.upper().strip()
+    k = re.sub(r"\s+TOWNSHIP$", "", k)
+    k = k.replace(" ", "")
+    return k
+
+
+def fips_to_county_number(fips3):
+    """Indiana DLGF county_number (alphabetical, 1-92) from 3-digit county FIPS."""
+    return f"{(int(fips3) + 1) // 2:02d}"
+
+
+def load_dlgf_lookup():
+    """{(county_number, twp_key(name)): (county_number, township_number)}."""
+    if not os.path.exists(DLGF_CSV):
+        sys.exit("ERROR: missing %s (DLGF township codes)." % DLGF_CSV)
+    lookup = {}
+    with open(DLGF_CSV, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            cn = str(row["county_number"]).zfill(2)
+            key = (cn, twp_key(row["township_name"]))
+            lookup[key] = (cn, row["township_number"])
+    return lookup
 
 
 def fetch_population(api_key):
@@ -126,28 +154,42 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     pop = fetch_population(api_key)
     area = fetch_land_area()
+    dlgf = load_dlgf_lookup()
 
     n = 0
+    unmatched = []
     with open(OUT_CSV, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["geoid", "state_fips", "county_fips", "county_name",
                     "cousub_fips", "subdivision_name", "township_name",
                     "subdivision_type", "population_2020", "land_sqmi",
-                    "data_vintage"])
+                    "data_vintage", "county_number", "township_number"])
         for geoid, (sub_name, county_name, p) in sorted(pop.items()):
             twp_name = (sub_name.replace(" township", "")
                         .replace(" Township", "").strip())
+            county_num = fips_to_county_number(geoid[2:5])
+            dlgf_match = dlgf.get((county_num, twp_key(sub_name)))
+            if dlgf_match:
+                out_county_number, out_township_number = dlgf_match
+            else:
+                out_county_number, out_township_number = "", ""
+                unmatched.append((county_num, county_name, sub_name))
             w.writerow([geoid, geoid[:2], geoid[2:5], county_name, geoid[5:],
                         sub_name, twp_name, subdivision_type(sub_name),
                         p if p is not None else "",
                         area.get(geoid, "") if area.get(geoid) is not None
-                        else "", DATA_VINTAGE])
+                        else "", DATA_VINTAGE,
+                        out_county_number, out_township_number])
             n += 1
     missing = [g for g in pop if g not in area]
     print("\nWrote %d rows -> %s" % (n, OUT_CSV))
     if missing:
         print("  NOTE: %d subdivisions had no Gazetteer area match "
               "(land_sqmi blank)." % len(missing))
+    if unmatched:
+        print("  Unmatched (no DLGF code): %d" % len(unmatched))
+        for cn, county_name, sub_name in sorted(unmatched):
+            print("    county %s  %-22s  %s" % (cn, county_name, sub_name))
 
 
 if __name__ == "__main__":

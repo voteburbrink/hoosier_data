@@ -285,6 +285,21 @@ FILE_FORMAT = (TYPE='CSV' SKIP_HEADER=1 FIELD_OPTIONALLY_ENCLOSED_BY='"'
     NULL_IF=('') ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE)
 ON_ERROR = 'CONTINUE';
 
+-- ── DLGF TAX RATE CHART: DISTRICT -> UNIT CROSSWALK (KAN-153) ─────────────────
+-- Stage: GATEWAY_STAGE
+-- Pre-process: scripts/download_dlgf_trc.py then scripts/load_snowflake_trc.py
+--   (xlsx -> <year>_trc_unit.csv, header stripped, PUT, then this COPY)
+-- SKIP_HEADER=0 because the loader already drops the header row.
+-- PURGE=FALSE: to refresh a year, DELETE that budget_year first
+--   (never CREATE OR REPLACE the RAW table — see create_tables.sql warning).
+
+COPY INTO HOOSIER_DATA.RAW.DLGF_TAX_DISTRICT_UNITS
+FROM @HOOSIER_DATA.RAW.GATEWAY_STAGE
+PATTERN = '.*_trc_unit\.csv.*'
+FILE_FORMAT = (TYPE='CSV' SKIP_HEADER=0 FIELD_OPTIONALLY_ENCLOSED_BY='"'
+    NULL_IF=('') ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE)
+ON_ERROR = 'CONTINUE';
+
 -- ── FEDERAL CONTRACTS ─────────────────────────────────────
 -- Stage: CONTRACTS_STAGE
 -- Files: Indiana-filtered CSVs from INDIANA_CONTRACTS folder

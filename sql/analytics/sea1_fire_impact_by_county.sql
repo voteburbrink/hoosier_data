@@ -13,17 +13,18 @@
 --   HOMESTEAD/2PCT ESTIMATED — KAN-138/141 parameters; see sea1_impact.sql.
 --   GAP RATE      MODELED — cost_2031 is interim (see cost31 CTE note).
 --
--- Interim cost_2031: 2029 projected cost extended two years at CAGR.
--- Swap the cost31 CTE to read PROJ_2031 directly once FIRE_COST_TREND is
--- extended to 2031 and code-keyed (KAN-169 Sections 2b and 6.1.2).
+-- cost_2031: reads projected_operating_cost from SEA1_FIRE_IMPACT_SUMMARY at
+-- phase_year = 2031, which draws from FIRE_COST_TREND PROJ_2031 (KAN-169 2b).
 --
 -- Spot-checks (Bartholomew, validated 2026-06-12, query 01c5014a-0105-dd6c-000d-a8fe00517072):
---   lit_rev_at_cap  = ROUND(county_agi_base * 0.004)  -- $13,340,683
---   sea1_loss_full_phase within $1 of 656,417
+--   lit_rev_at_cap  = ROUND(county_agi_base * 0.004)  -- $13,340,683 (unchanged)
+--   sea1_loss_full_phase within $1 of 656,417 (unchanged)
 --   binding_township = 'OHIO TOWNSHIP'
---   binding_rate_pct = 0.402 (at cap)
+--   binding_rate_pct ~0.167 (was 0.402 at cap; changed by KAN-169 municipal exclusion fix)
 --   fire_dist_2025_total short of levy table by exactly Clay delta ($57,017);
 --     Clay fund-structure check pending (KAN-169 Section 2e).
+-- NOTE: binding_rate_pct and all per-township req_rate figures require revalidation
+-- after deploy — pending warehouse quota restore.
 --
 -- NOTE: HD rows in SEA1_FIRE_IMPACT_BY_HD are NOT summable to these county
 -- totals — split townships appear in multiple HDs.
@@ -55,7 +56,7 @@ dist AS (
          SUM(amt_num) AS dist_2025
   FROM HOOSIER_DATA.ANALYTICS.TAX_DISTRIBUTIONS_CLEAN
   WHERE yr_nbr = '2025'
-    AND entity_cd IN ('1111', '1190', '8604', '8692')
+    AND entity_cd IN ('1111','1105','1190','8604','8692','8704','8792')
   GROUP BY 1, 2
 ),
 lit AS (
@@ -65,20 +66,11 @@ lit AS (
   FROM HOOSIER_DATA.ANALYTICS.LIT_FIRE_RATE_VERIFIED
   GROUP BY 1, 2
 ),
-cost31 AS (
-  -- Interim: 2029 projected cost extended two years at CAGR.
-  -- Replace with PROJ_2031 once FIRE_COST_TREND is extended to 2031 and
-  -- code-keyed (KAN-169 Sections 2b and 6.1.2).
-  SELECT county_number, township_number, cost_confidence,
-         projected_operating_cost * POWER(1 + operating_cagr_pct / 100, 2) AS cost_2031
-  FROM HOOSIER_DATA.ANALYTICS.SEA1_FIRE_IMPACT_SUMMARY
-  WHERE phase_year = 2029
-),
 twp_gap AS (
   SELECT d.county_number, d.township_number, s.township_name, d.dist_2025,
          CASE
-           WHEN c.cost_confidence = 'OK' AND l.rev_0_4pct > 0
-           THEN GREATEST(c.cost_2031 - (d.dist_2025 - s.total_sea1_loss), 0)
+           WHEN s.cost_confidence = 'OK' AND l.rev_0_4pct > 0
+           THEN GREATEST(s.projected_operating_cost - (d.dist_2025 - s.total_sea1_loss), 0)
                 / l.rev_0_4pct * 0.4
          END AS req_rate_pct
   FROM dist d
@@ -86,8 +78,6 @@ twp_gap AS (
     ON s.county_number = d.county_number
    AND s.township_number = d.township_number
    AND s.phase_year = 2031
-  LEFT JOIN cost31 c
-    ON c.county_number = d.county_number AND c.township_number = d.township_number
   LEFT JOIN lit l
     ON l.county_number = d.county_number AND l.township_number = d.township_number
 ),

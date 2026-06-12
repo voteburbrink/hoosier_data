@@ -576,12 +576,14 @@ SELECT
     w.cost_2016, w.cost_2017, w.cost_2018, w.cost_2019, w.cost_2020,
     w.cost_2021, w.cost_2022, w.cost_2023,
     w.cost_2024                                                    AS cost_2024_actual,
-    -- Projections 2025-2029
+    -- Projections 2025-2031
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 1)) AS proj_2025,
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 2)) AS proj_2026,
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 3)) AS proj_2027,
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 4)) AS proj_2028,
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 5)) AS proj_2029,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 6)) AS proj_2030,
+    ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 7)) AS proj_2031,
     CASE
         WHEN w.years_of_data < 4                       THEN 'LOW_CONFIDENCE — fewer than 4 years'
         WHEN w.cost_2024 IS NULL                       THEN 'LOW_CONFIDENCE — no 2024 actual'
@@ -646,7 +648,7 @@ cost AS (
         t.county_number,
         t.township_number,
         fc.operating_cagr_pct,
-        fc.proj_2026, fc.proj_2027, fc.proj_2028, fc.proj_2029,
+        fc.proj_2026, fc.proj_2027, fc.proj_2028, fc.proj_2029, fc.proj_2030, fc.proj_2031,
         fc.avg_replacement_reserve,
         fc.confidence_flag
     FROM HOOSIER_DATA.ANALYTICS.FIRE_COST_TREND fc
@@ -693,6 +695,8 @@ SELECT
         WHEN 2027 THEN c.proj_2027
         WHEN 2028 THEN c.proj_2028
         WHEN 2029 THEN c.proj_2029
+        WHEN 2030 THEN c.proj_2030
+        WHEN 2031 THEN c.proj_2031
         ELSE NULL
     END                                                           AS projected_operating_cost,
     ROUND(c.avg_replacement_reserve)                              AS avg_replacement_reserve,
@@ -708,6 +712,8 @@ SELECT
               WHEN 2027 THEN COALESCE(c.proj_2027, 0) - COALESCE(lv.fire_levy_2024, 0)
               WHEN 2028 THEN COALESCE(c.proj_2028, 0) - COALESCE(lv.fire_levy_2024, 0)
               WHEN 2029 THEN COALESCE(c.proj_2029, 0) - COALESCE(lv.fire_levy_2024, 0)
+              WHEN 2030 THEN COALESCE(c.proj_2030, 0) - COALESCE(lv.fire_levy_2024, 0)
+              WHEN 2031 THEN COALESCE(c.proj_2031, 0) - COALESCE(lv.fire_levy_2024, 0)
               ELSE 0
           END
     )                                                             AS projected_net_gap,

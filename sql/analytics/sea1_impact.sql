@@ -424,18 +424,26 @@ ORDER BY p.county_number, p.township_name, bp.phase_year;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 5. FIRE_COST_TREND  (KAN-139)
---    Cleaned operating CAGR per township, 2020–2024 actuals + 2025–2029 projection.
+--    Cleaned operating CAGR per township, 2011–2024 actuals + 2025–2029 projection.
+--    Full history: 2020+ from RAW.GATEWAY_DISBURSEMENTS (cleaned, authoritative);
+--    2011–2019 from RAW.GATEWAY_DISBURSEMENTS_LEGACY. The legacy table's fields
+--    are double-quote-wrapped and space-padded (REPLACE+TRIM), and two columns
+--    map differently: fund_name -> unit_fund_name, class_name -> disburse_class_name.
+--    CAGR runs over the full span (first observed year -> 2024).
 --    Transfer exclusion rule (MANDATORY):
 --      Exclude CLASS_NAME = 'Other Disbursements' AND DISBURSE_NAME LIKE 'Transfer Out%'
 --      Harrison 2024 without exclusion: ~$943K; with exclusion: ~$549K (correct).
 --    Capital (CUMULATIVE FIRE) tracked separately as replacement reserve — not in CAGR.
---    Statewide; fire funds identified by fund_code '1111' + '%FIRE%' in fund_name.
---    Fewer than 4 clean years or CAGR > 25%: flag as LOW_CONFIDENCE.
+--    Statewide; fire funds identified by '%FIRE%' in fund_name.
+--    LOW_CONFIDENCE when: fewer than 4 clean years; full-span |CAGR| > 25%; no 2024
+--    actual; or 2024 collapses to < 40% of the series median (e.g. Wayne moved
+--    fire service out — 2024 $7.5K vs $70.5K median).
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.FIRE_COST_TREND AS
 WITH operating AS (
-    -- Operating fire disbursements with transfer exclusion
+    -- Operating fire disbursements with transfer exclusion.
+    -- 2020+ : current cleaned table.
     SELECT
         YEAR::INTEGER                                              AS year,
         TRIM(cnty_description)                                     AS county_description,
@@ -443,6 +451,7 @@ WITH operating AS (
         ROUND(SUM(TRY_TO_DOUBLE(REPLACE(amount, ',', ''))))        AS operating_cost
     FROM HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS
     WHERE afr_unit_type = '7'
+      AND YEAR::INTEGER >= 2020
       AND UPPER(fund_name) LIKE '%FIRE%'
       AND UPPER(fund_name) NOT LIKE '%CUMULATIVE FIRE%'
       AND UPPER(fund_name) NOT LIKE '%FIRE BUILDING%'
@@ -451,6 +460,25 @@ WITH operating AS (
           AND UPPER(disburse_name) LIKE 'TRANSFER OUT%'
       )
     GROUP BY YEAR::INTEGER, TRIM(cnty_description), TRIM(unit_name)
+    UNION ALL
+    -- 2011-2019 : legacy table (quote-wrapped + space-padded fields;
+    -- fund_name -> unit_fund_name, class_name -> disburse_class_name).
+    SELECT
+        TRIM(REPLACE(year, '"', ''))::INTEGER                      AS year,
+        TRIM(REPLACE(cnty_description, '"', ''))                   AS county_description,
+        TRIM(REPLACE(unit_name, '"', ''))                          AS township,
+        ROUND(SUM(TRY_TO_DOUBLE(REPLACE(REPLACE(amount, '"', ''), ',', '')))) AS operating_cost
+    FROM HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_LEGACY
+    WHERE TRIM(REPLACE(afr_unit_type, '"', '')) = '7'
+      AND TRIM(REPLACE(year, '"', ''))::INTEGER BETWEEN 2011 AND 2019
+      AND UPPER(REPLACE(unit_fund_name, '"', '')) LIKE '%FIRE%'
+      AND UPPER(REPLACE(unit_fund_name, '"', '')) NOT LIKE '%CUMULATIVE FIRE%'
+      AND UPPER(REPLACE(unit_fund_name, '"', '')) NOT LIKE '%FIRE BUILDING%'
+      AND NOT (
+          UPPER(TRIM(REPLACE(disburse_class_name, '"', ''))) = 'OTHER DISBURSEMENTS'
+          AND UPPER(TRIM(REPLACE(disburse_name, '"', ''))) LIKE 'TRANSFER OUT%'
+      )
+    GROUP BY 1, 2, 3
 ),
 cumulative_fire AS (
     -- Capital / replacement reserve (kept separate from operating)
@@ -461,8 +489,21 @@ cumulative_fire AS (
         ROUND(SUM(TRY_TO_DOUBLE(REPLACE(amount, ',', ''))))        AS replacement_reserve
     FROM HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS
     WHERE afr_unit_type = '7'
+      AND YEAR::INTEGER >= 2020
       AND (fund_code IN ('1190', '8190') OR UPPER(fund_name) LIKE '%CUMULATIVE FIRE%')
     GROUP BY YEAR::INTEGER, TRIM(cnty_description), TRIM(unit_name)
+    UNION ALL
+    SELECT
+        TRIM(REPLACE(year, '"', ''))::INTEGER                      AS year,
+        TRIM(REPLACE(cnty_description, '"', ''))                   AS county_description,
+        TRIM(REPLACE(unit_name, '"', ''))                          AS township,
+        ROUND(SUM(TRY_TO_DOUBLE(REPLACE(REPLACE(amount, '"', ''), ',', '')))) AS replacement_reserve
+    FROM HOOSIER_DATA.RAW.GATEWAY_DISBURSEMENTS_LEGACY
+    WHERE TRIM(REPLACE(afr_unit_type, '"', '')) = '7'
+      AND TRIM(REPLACE(year, '"', ''))::INTEGER BETWEEN 2011 AND 2019
+      AND (TRIM(REPLACE(fund_code, '"', '')) IN ('1190', '8190')
+           OR UPPER(REPLACE(unit_fund_name, '"', '')) LIKE '%CUMULATIVE FIRE%')
+    GROUP BY 1, 2, 3
 ),
 series AS (
     SELECT
@@ -476,7 +517,7 @@ series AS (
         ON o.county_description = cf.county_description
         AND o.township = cf.township
         AND o.year = cf.year
-    WHERE o.year BETWEEN 2020 AND 2024
+    WHERE o.year BETWEEN 2011 AND 2024
       AND o.operating_cost > 0
 ),
 cagr_calc AS (
@@ -491,20 +532,28 @@ cagr_calc AS (
                                 AND s2.township = s.township)
                  THEN operating_cost END)                          AS first_year_cost,
         MAX(CASE WHEN year = 2024 THEN operating_cost END)        AS cost_2024,
-        AVG(replacement_reserve)                                   AS avg_replacement_reserve
+        MEDIAN(operating_cost)                                     AS median_cost,
+        AVG(replacement_reserve)                                   AS avg_replacement_reserve,
+        -- Actuals exposed as year columns (full 2011-2024 history)
+        MAX(CASE WHEN year = 2011 THEN operating_cost END)        AS cost_2011,
+        MAX(CASE WHEN year = 2012 THEN operating_cost END)        AS cost_2012,
+        MAX(CASE WHEN year = 2013 THEN operating_cost END)        AS cost_2013,
+        MAX(CASE WHEN year = 2014 THEN operating_cost END)        AS cost_2014,
+        MAX(CASE WHEN year = 2015 THEN operating_cost END)        AS cost_2015,
+        MAX(CASE WHEN year = 2016 THEN operating_cost END)        AS cost_2016,
+        MAX(CASE WHEN year = 2017 THEN operating_cost END)        AS cost_2017,
+        MAX(CASE WHEN year = 2018 THEN operating_cost END)        AS cost_2018,
+        MAX(CASE WHEN year = 2019 THEN operating_cost END)        AS cost_2019,
+        MAX(CASE WHEN year = 2020 THEN operating_cost END)        AS cost_2020,
+        MAX(CASE WHEN year = 2021 THEN operating_cost END)        AS cost_2021,
+        MAX(CASE WHEN year = 2022 THEN operating_cost END)        AS cost_2022,
+        MAX(CASE WHEN year = 2023 THEN operating_cost END)        AS cost_2023
     FROM series s
     GROUP BY county_description, township
 ),
 with_cagr AS (
     SELECT
-        county_description,
-        township,
-        years_of_data,
-        first_year,
-        last_year,
-        first_year_cost,
-        cost_2024,
-        avg_replacement_reserve,
+        *,
         CASE
             WHEN first_year_cost > 0 AND cost_2024 > 0 AND (last_year - first_year) > 0
             THEN POWER(cost_2024 / first_year_cost, 1.0 / (last_year - first_year)) - 1
@@ -522,12 +571,11 @@ SELECT
     ROUND(w.cost_2024)                                             AS cost_2024_operating,
     ROUND(w.avg_replacement_reserve)                               AS avg_replacement_reserve,
     ROUND(w.operating_cagr * 100, 2)                               AS operating_cagr_pct,
-    -- Actuals joined back
-    s2020.operating_cost                                           AS cost_2020,
-    s2021.operating_cost                                           AS cost_2021,
-    s2022.operating_cost                                           AS cost_2022,
-    s2023.operating_cost                                           AS cost_2023,
-    s2024.operating_cost                                           AS cost_2024_actual,
+    -- Actuals (full 2011-2024 history)
+    w.cost_2011, w.cost_2012, w.cost_2013, w.cost_2014, w.cost_2015,
+    w.cost_2016, w.cost_2017, w.cost_2018, w.cost_2019, w.cost_2020,
+    w.cost_2021, w.cost_2022, w.cost_2023,
+    w.cost_2024                                                    AS cost_2024_actual,
     -- Projections 2025-2029
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 1)) AS proj_2025,
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 2)) AS proj_2026,
@@ -535,16 +583,13 @@ SELECT
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 4)) AS proj_2028,
     ROUND(w.cost_2024 * POWER(1 + COALESCE(w.operating_cagr, 0), 5)) AS proj_2029,
     CASE
-        WHEN w.years_of_data < 4           THEN 'LOW_CONFIDENCE — fewer than 4 years'
-        WHEN ABS(w.operating_cagr) > 0.25  THEN 'LOW_CONFIDENCE — CAGR > 25%'
+        WHEN w.years_of_data < 4                       THEN 'LOW_CONFIDENCE — fewer than 4 years'
+        WHEN w.cost_2024 IS NULL                       THEN 'LOW_CONFIDENCE — no 2024 actual'
+        WHEN ABS(w.operating_cagr) > 0.25              THEN 'LOW_CONFIDENCE — CAGR > 25%'
+        WHEN w.cost_2024 < 0.4 * w.median_cost         THEN 'LOW_CONFIDENCE — 2024 collapse vs median'
         ELSE 'OK'
     END                                                            AS confidence_flag
 FROM with_cagr w
-LEFT JOIN series s2020 ON w.county_description = s2020.county_description AND w.township = s2020.township AND s2020.year = 2020
-LEFT JOIN series s2021 ON w.county_description = s2021.county_description AND w.township = s2021.township AND s2021.year = 2021
-LEFT JOIN series s2022 ON w.county_description = s2022.county_description AND w.township = s2022.township AND s2022.year = 2022
-LEFT JOIN series s2023 ON w.county_description = s2023.county_description AND w.township = s2023.township AND s2023.year = 2023
-LEFT JOIN series s2024 ON w.county_description = s2024.county_description AND w.township = s2024.township AND s2024.year = 2024
 ORDER BY county_description, township;
 
 

@@ -59,7 +59,7 @@ Views in `HOOSIER_DATA.ANALYTICS` that sit on top of the raw tables:
 | `SEA1_BPP_LOSS` | BPP levy loss by township, township-proper districts only |
 | `SEA1_HOMESTEAD_LOSS` | Per-parcel homestead deduction delta by township and phase year 2026-2031 |
 | `SEA1_2PCT_BUCKET_LOSS` | Phased AV deduction for 2%-cap property (third SEA-1 mechanism) |
-| `FIRE_COST_TREND` | Township fire operating CAGR and 2029 projections, with transfer exclusion |
+| `FIRE_COST_TREND` | Township fire operating CAGR (2011-2024 full history) and 2025-2029 projections; transfer exclusion; pre-2020 backfilled from `GATEWAY_DISBURSEMENTS_LEGACY` |
 | `SEA1_FIRE_IMPACT_SUMMARY` | Combined output: loss + cost + net gap, provenance-flagged per column |
 | `FIRE_REVENUE_TREND` | Actual fire fund receipts 2020-2024 by source (property tax, LIT, excise, etc.) |
 | `LIT_FIRE_RATE_PROJECTION` | LIT fire rate revenue scenarios at 0.025/0.05/0.10% AGI |
@@ -81,6 +81,7 @@ sql/
     sea1_impact.sql             -- SEA-1 fire fund impact model (statewide)
 
 scripts/
+  download_gateway_afr.py       -- Download AFR reports (Disbursements by Fund, etc.) by year/unit
   download_gateway_parcel.py    -- Download PARCEL files by county from Gateway
   parse_gateway_parcel.py       -- Parse fixed-width PARCEL records to CSV
   load_snowflake_parcel.py      -- Stage and COPY INTO GATEWAY_PARCEL

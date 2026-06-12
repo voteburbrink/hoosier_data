@@ -41,104 +41,11 @@ CREATE TABLE IF NOT EXISTS HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS (
     source_note     VARCHAR
 );
 
--- ── HOMESTEAD: standard deduction cap (IC 6-1.1-12-37) ──────────────────────
--- Old law cap: $45,000. SEA-1 phases to $60,000 by 2031 (+$2,500/yr).
--- ESTIMATE — verify exact phase-in schedule against HEA 1001 (2024).
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT 'HOMESTEAD', yr, 'STD_DED_CAP', cap, 45000.0, FALSE,
-    'ESTIMATE — old law $45K; SEA-1 +$2,500/yr to $60K by 2031. Verify HEA 1001 (2024).'
-FROM (VALUES
-    (2025, 45000.0),
-    (2026, 47500.0),
-    (2027, 50000.0),
-    (2028, 52500.0),
-    (2029, 55000.0),
-    (2030, 57500.0),
-    (2031, 60000.0)
-) t(yr, cap)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = 'HOMESTEAD' AND phase_year = t.yr AND param_name = 'STD_DED_CAP'
-);
-
--- HOMESTEAD: 60% AV fraction (unchanged by SEA-1)
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT 'HOMESTEAD', yr, 'STD_DED_PCT', 0.60, 0.60, TRUE,
-    'IC 6-1.1-12-37 — 60% of AV unchanged by SEA-1.'
-FROM (VALUES (2025),(2026),(2027),(2028),(2029),(2030),(2031)) t(yr)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = 'HOMESTEAD' AND phase_year = t.yr AND param_name = 'STD_DED_PCT'
-);
-
--- HOMESTEAD: supplemental deduction tier 1 rate (IC 6-1.1-12-37.5)
--- Old law: 35% on net AV (after std ded) ≤ $600K. Verify SEA-1 change.
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT 'HOMESTEAD', yr, 'SUPP_RATE_TIER1', 0.35, 0.35, FALSE,
-    'ESTIMATE — old law 35%. Verify whether SEA-1 revised supplemental formula.'
-FROM (VALUES (2025),(2026),(2027),(2028),(2029),(2030),(2031)) t(yr)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = 'HOMESTEAD' AND phase_year = t.yr AND param_name = 'SUPP_RATE_TIER1'
-);
-
--- HOMESTEAD: supplemental deduction tier threshold
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT 'HOMESTEAD', yr, 'SUPP_THRESHOLD', 600000.0, 600000.0, FALSE,
-    'ESTIMATE — old law $600K tier. Verify SEA-1 change if any.'
-FROM (VALUES (2025),(2026),(2027),(2028),(2029),(2030),(2031)) t(yr)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = 'HOMESTEAD' AND phase_year = t.yr AND param_name = 'SUPP_THRESHOLD'
-);
-
--- HOMESTEAD: supplemental deduction tier 2 rate (above $600K)
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT 'HOMESTEAD', yr, 'SUPP_RATE_TIER2', 0.25, 0.25, FALSE,
-    'ESTIMATE — old law 25% above $600K. Verify SEA-1 change if any.'
-FROM (VALUES (2025),(2026),(2027),(2028),(2029),(2030),(2031)) t(yr)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = 'HOMESTEAD' AND phase_year = t.yr AND param_name = 'SUPP_RATE_TIER2'
-);
-
--- ── 2PCT_BUCKET: phased AV deduction (KAN-141 mechanism) ────────────────────
--- SEA-1 phases in AV deduction for all 2%-cap property, reaching 1/3 by 2031.
--- Linear 6-year phase-in assumed. Verify exact annual schedule.
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT '2PCT_BUCKET', yr, 'BUCKET_DED_PCT', pct, 0.0, FALSE,
-    'ESTIMATE — SEA-1 phases to 1/3 AV by 2031 (6-yr linear assumed). Verify schedule.'
-FROM (VALUES
-    (2025, 0.0),
-    (2026, 0.0556),
-    (2027, 0.1111),
-    (2028, 0.1667),
-    (2029, 0.2222),
-    (2030, 0.2778),
-    (2031, 0.3333)
-) t(yr, pct)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = '2PCT_BUCKET' AND phase_year = t.yr AND param_name = 'BUCKET_DED_PCT'
-);
-
--- ── BPP: exemption threshold (IC 6-1.1-31.5) ────────────────────────────────
--- Raised $80K → $2M effective 2025 assessment. All taxpayers with BPP AV ≤ $2M exempt.
-INSERT INTO HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    (mechanism, phase_year, param_name, param_value, old_law_value, verified, source_note)
-SELECT 'BPP', yr, 'BPP_EXEMPTION_THRESHOLD', 2000000.0, 80000.0, TRUE,
-    'HEA 1001 (2024) IC 6-1.1-31.5 — threshold $80K→$2M effective 2025 assessment.'
-FROM (VALUES (2025),(2026),(2027),(2028),(2029),(2030),(2031)) t(yr)
-WHERE NOT EXISTS (
-    SELECT 1 FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
-    WHERE mechanism = 'BPP' AND phase_year = t.yr AND param_name = 'BPP_EXEMPTION_THRESHOLD'
-);
+-- ── DEDUCTION PARAMS: see sql/lit_fire/04_deploy_kan171.sql ─────────────────
+-- KAN-171 (2026-06-12): statute-verified params replace the original estimates.
+-- Run 04_deploy_kan171.sql (TRUNCATE + INSERT) before re-deploying these views.
+-- Old-law counterfactuals for homestead are now hardcoded in view logic rather
+-- than stored in this table (they are invariant constants, not estimates).
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -232,24 +139,32 @@ WHERE p.pay_year = '2025';
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 2. SEA1_BPP_LOSS
---    Formalizes the verified BPP loss table (Confluence IK/16547841).
---    BPP loss = district BPP AV (CERT_NAV 2025) × combined fire rate / 100.
+-- 2. SEA1_BPP_LOSS  (KAN-171: timing correction)
+--    BPP loss = district BPP AV (CERT_NAV 2025) × combined fire rate / 100,
+--    per phase_year. Zero for pay 2026 ($80K threshold still applies per HEA
+--    1427; $2M threshold first applies to 2026 assessment = pay 2027).
 --    Statewide; filter to county for specific packets.
 --
---    SCOPE RULE: township-proper districts only (tax_district_name LIKE '%TWP%'
---    or '%TOWNSHIP%'). City, annex, and town sub-districts are excluded —
---    those areas are served by city/town fire departments, not the township VFD,
---    and their BPP (often very large) would wildly overstate township fire loss.
---    E.g. City of Columbus district BPP = $573M vs Columbus Twp-proper = $14M.
+--    SCOPE RULE: township-proper districts only (LIKE '%TWP%' / '%TOWNSHIP%').
+--    City and annex sub-districts excluded — wildly overstates loss otherwise
+--    (City of Columbus BPP = $573M vs Columbus Twp-proper = $14M).
 --
---    RATE NOTE: Uses 2024 FORM4B certified rates. Confluence IK/16547841 used
---    2026 DLGF certified rates; dollar totals will differ until FORM4B 2026 loads.
---    Note: reconcile Confluence total $110,999 vs $110,989 in KAN-140.
+--    RATE NOTE: 2024 FORM4B certified rates. Confluence total $110,999 uses
+--    2026 DLGF rates; difference reconciled in KAN-140.
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.SEA1_BPP_LOSS AS
-WITH cert_nav_deduped AS (
+WITH bpp_params AS (
+    -- One row per phase_year; threshold >= 2M flags years where loss applies.
+    SELECT
+        phase_year,
+        param_value AS bpp_threshold,
+        verified
+    FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
+    WHERE mechanism = 'BPP'
+      AND param_name = 'BPP_EXEMPTION_THRESHOLD'
+),
+cert_nav_deduped AS (
     SELECT
         TRIM(budget_year)                       AS budget_year,
         TRIM(county_number)                     AS county_number,
@@ -265,23 +180,32 @@ WITH cert_nav_deduped AS (
     ) = 1
 ),
 district_township_map AS (
-    -- Aggregate parcel view to district level to get township + fire rate mapping
     SELECT DISTINCT
         county_number, tax_district_code, township_number, township_name, fire_rate_per_100
     FROM HOOSIER_DATA.ANALYTICS.PARCEL_DISTRICT_RATE
 )
 SELECT
-    cn.budget_year                                                  AS pay_year,
+    bp.phase_year,
     cn.county_number,
     cn.tax_district_code,
     cn.tax_district_name,
     dtm.township_number,
     dtm.township_name,
-    ROUND(cn.bus_pp_net_av)                                        AS bpp_nav,
-    ROUND(dtm.fire_rate_per_100, 6)                                AS fire_rate_per_100,
-    ROUND(cn.bus_pp_net_av * COALESCE(dtm.fire_rate_per_100, 0) / 100, 2) AS bpp_annual_loss,
-    'VERIFIED'                                                     AS provenance
+    ROUND(cn.bus_pp_net_av)                                         AS bpp_nav,
+    bp.bpp_threshold                                                AS threshold_applies,
+    ROUND(dtm.fire_rate_per_100, 6)                                 AS fire_rate_per_100,
+    -- Loss is zero for pay 2026 (threshold still $80K); full from pay 2027.
+    ROUND(CASE
+        WHEN bp.bpp_threshold >= 2000000
+        THEN cn.bus_pp_net_av * COALESCE(dtm.fire_rate_per_100, 0) / 100
+        ELSE 0
+    END, 2)                                                         AS bpp_annual_loss,
+    CASE
+        WHEN bp.bpp_threshold >= 2000000 THEN 'VERIFIED'
+        ELSE 'N/A — $80K threshold, loss starts pay 2027'
+    END                                                             AS provenance
 FROM cert_nav_deduped cn
+CROSS JOIN bpp_params bp
 LEFT JOIN district_township_map dtm
     ON cn.county_number = dtm.county_number
     AND cn.tax_district_code = dtm.tax_district_code
@@ -289,33 +213,39 @@ WHERE cn.budget_year = '2025';
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 3. SEA1_HOMESTEAD_LOSS  (KAN-138)
+-- 3. SEA1_HOMESTEAD_LOSS  (KAN-138 / KAN-171: formula rewrite)
 --    Per-parcel homestead deduction delta × fire rate, rolled up to township × year.
---    Uses parcel-grain because standard deduction caps per parcel (not aggregate).
---    Statewide; 2025 vintage only per cap-class reliability rule.
+--    Parcel-grain required: standard deduction caps per parcel, not aggregate.
+--    Statewide; 2025 parcel vintage per cap-class reliability rule.
 --
---    Deduction formulas (ESTIMATES — verify against HEA 1001 2024):
---      Standard ded = LEAST(0.60 × homestead_av, std_ded_cap)
---      Net AV after std = homestead_av - standard_ded
---      Supplemental ded = 0.35 × LEAST(net_av, 600K) + 0.25 × MAX(net_av - 600K, 0)
---      AV delta = (new_std_ded - old_std_ded) + (new_supp_ded - old_supp_ded)
---      Fire loss = AV_delta × fire_rate / 100
+--    Formulas (both verified against statute 2026-06-12):
+--
+--    Old-law counterfactual (hardcoded; same for all phase years):
+--      old_std  = LEAST(0.60 × gross_av, 48000)   [IC 6-1.1-12-37 pre-SEA-1]
+--      old_supp = 0.375 × LEAST(gross_av - old_std, 600000)
+--               + 0.275 × MAX(gross_av - old_std - 600000, 0)
+--                                                  [IC 6-1.1-12-37.5 pay-2025 baseline]
+--
+--    New-law (from SEA1_DEDUCTION_PARAMS per phase year):
+--      new_std  = STD_DED_AMT[Y]                   [flat amount, $48K→$0 by 2031]
+--      new_supp = LEAST((gross_av - new_std) × SUPP_RATE[Y],
+--                        SUPP_CAP_PCT_GROSS_AV × gross_av)
+--                                                  [single rate, 75% gross AV cap]
+--
+--    homestead_fire_loss = (new_total_ded - old_total_ded) × fire_rate / 100
+--      Positive = fire fund loses levy base (new law more generous with deductions).
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE VIEW HOOSIER_DATA.ANALYTICS.SEA1_HOMESTEAD_LOSS AS
 WITH params AS (
-    -- Pivot parameter rows into columns per phase year for efficiency
     SELECT
         phase_year,
-        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN param_value END) AS std_ded_cap_new,
-        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN old_law_value END) AS std_ded_cap_old,
-        MAX(CASE WHEN param_name = 'STD_DED_PCT'     THEN param_value END) AS std_ded_pct,
-        MAX(CASE WHEN param_name = 'SUPP_RATE_TIER1' THEN param_value END) AS supp_r1,
-        MAX(CASE WHEN param_name = 'SUPP_THRESHOLD'  THEN param_value END) AS supp_thresh,
-        MAX(CASE WHEN param_name = 'SUPP_RATE_TIER2' THEN param_value END) AS supp_r2,
-        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN verified END)    AS params_verified
+        MAX(CASE WHEN param_name = 'STD_DED_AMT'           THEN param_value END) AS std_ded_amt_new,
+        MAX(CASE WHEN param_name = 'SUPP_RATE'             THEN param_value END) AS supp_rate_new,
+        MAX(CASE WHEN param_name = 'SUPP_CAP_PCT_GROSS_AV' THEN param_value END) AS supp_cap_pct
     FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
     WHERE mechanism = 'HOMESTEAD'
+      AND phase_year BETWEEN 2026 AND 2031
     GROUP BY phase_year
 ),
 parcel_base AS (
@@ -332,47 +262,47 @@ SELECT
     p.township_number,
     p.township_name,
     pr.phase_year,
-    COUNT(*)                                                            AS homestead_parcel_count,
-    -- Old law deductions
-    ROUND(SUM(LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old))) AS total_old_std_ded,
+    COUNT(*)                                                                AS homestead_parcel_count,
+    -- Old-law deductions (hardcoded statute constants; same counterfactual for all years)
+    ROUND(SUM(LEAST(0.60 * p.homestead_av, 48000.0)))                      AS total_old_std_ded,
     ROUND(SUM(
-        pr.supp_r1 * LEAST(GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old), 0), pr.supp_thresh)
-        + pr.supp_r2 * GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old) - pr.supp_thresh, 0)
-    ))                                                                  AS total_old_supp_ded,
-    -- SEA-1 deductions
-    ROUND(SUM(LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new))) AS total_new_std_ded,
+        0.375 * LEAST(GREATEST(p.homestead_av - LEAST(0.60 * p.homestead_av, 48000.0), 0), 600000.0)
+        + 0.275 * GREATEST(p.homestead_av - LEAST(0.60 * p.homestead_av, 48000.0) - 600000.0, 0)
+    ))                                                                      AS total_old_supp_ded,
+    -- New-law deductions (SEA 1 s44/s45: flat standard, single-rate supplemental)
+    ROUND(SUM(pr.std_ded_amt_new))                                          AS total_new_std_ded,
     ROUND(SUM(
-        pr.supp_r1 * LEAST(GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new), 0), pr.supp_thresh)
-        + pr.supp_r2 * GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new) - pr.supp_thresh, 0)
-    ))                                                                  AS total_new_supp_ded,
-    -- AV delta (taxable base removed)
+        LEAST(
+            GREATEST(p.homestead_av - pr.std_ded_amt_new, 0) * pr.supp_rate_new,
+            pr.supp_cap_pct * p.homestead_av
+        )
+    ))                                                                      AS total_new_supp_ded,
+    -- AV delta: additional deduction under new law (positive = fire fund loses base)
     ROUND(SUM(
-        (LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new) - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old))
-        + (
-            pr.supp_r1 * LEAST(GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new), 0), pr.supp_thresh)
-            + pr.supp_r2 * GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new) - pr.supp_thresh, 0)
-            - pr.supp_r1 * LEAST(GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old), 0), pr.supp_thresh)
-            - pr.supp_r2 * GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old) - pr.supp_thresh, 0)
-          )
-    ))                                                                  AS homestead_av_delta,
-    -- Dollar fire levy loss
+        (pr.std_ded_amt_new
+         + LEAST(GREATEST(p.homestead_av - pr.std_ded_amt_new, 0) * pr.supp_rate_new,
+                 pr.supp_cap_pct * p.homestead_av))
+        - (LEAST(0.60 * p.homestead_av, 48000.0)
+           + 0.375 * LEAST(GREATEST(p.homestead_av - LEAST(0.60 * p.homestead_av, 48000.0), 0), 600000.0)
+           + 0.275 * GREATEST(p.homestead_av - LEAST(0.60 * p.homestead_av, 48000.0) - 600000.0, 0))
+    ))                                                                      AS homestead_av_delta,
+    -- Dollar fire levy loss (positive = fire fund receives less in property tax)
     ROUND(SUM(
         (
-            (LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new) - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old))
-            + (
-                pr.supp_r1 * LEAST(GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new), 0), pr.supp_thresh)
-                + pr.supp_r2 * GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_new) - pr.supp_thresh, 0)
-                - pr.supp_r1 * LEAST(GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old), 0), pr.supp_thresh)
-                - pr.supp_r2 * GREATEST(p.homestead_av - LEAST(pr.std_ded_pct * p.homestead_av, pr.std_ded_cap_old) - pr.supp_thresh, 0)
-              )
+            (pr.std_ded_amt_new
+             + LEAST(GREATEST(p.homestead_av - pr.std_ded_amt_new, 0) * pr.supp_rate_new,
+                     pr.supp_cap_pct * p.homestead_av))
+            - (LEAST(0.60 * p.homestead_av, 48000.0)
+               + 0.375 * LEAST(GREATEST(p.homestead_av - LEAST(0.60 * p.homestead_av, 48000.0), 0), 600000.0)
+               + 0.275 * GREATEST(p.homestead_av - LEAST(0.60 * p.homestead_av, 48000.0) - 600000.0, 0))
         ) * p.fire_rate_per_100 / 100
-    ), 2)                                                               AS homestead_fire_loss,
-    CASE WHEN pr.params_verified THEN 'VERIFIED' ELSE 'ESTIMATED' END  AS provenance
+    ), 2)                                                                   AS homestead_fire_loss,
+    'VERIFIED'                                                              AS provenance
 FROM parcel_base p
 CROSS JOIN params pr
 GROUP BY
     p.county_number, p.county_description, p.township_number,
-    p.township_name, pr.phase_year, pr.params_verified
+    p.township_name, pr.phase_year
 ORDER BY p.county_number, p.township_name, pr.phase_year;
 
 
@@ -619,11 +549,13 @@ phase_years AS (
     WHERE phase_year BETWEEN 2026 AND 2031
 ),
 bpp AS (
+    -- KAN-171: phase_year join required; BPP loss is 0 for pay 2026.
     SELECT
-        county_number, township_number, township_name,
-        SUM(bpp_annual_loss) AS bpp_loss
+        phase_year, county_number, township_number, township_name,
+        SUM(bpp_annual_loss) AS bpp_loss,
+        MAX(provenance)      AS provenance
     FROM HOOSIER_DATA.ANALYTICS.SEA1_BPP_LOSS
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4
 ),
 homestead AS (
     SELECT
@@ -676,9 +608,9 @@ SELECT
     py.phase_year,
     -- Baseline
     ROUND(lv.fire_levy_2024)                                      AS fire_levy_2024,
-    -- BPP loss (VERIFIED)
-    ROUND(b.bpp_loss)                                             AS bpp_loss,
-    'VERIFIED'                                                    AS bpp_provenance,
+    -- BPP loss (zero for pay 2026; VERIFIED from pay 2027 per HEA 1427 timing)
+    ROUND(COALESCE(b.bpp_loss, 0))                                AS bpp_loss,
+    COALESCE(b.provenance, 'N/A — $80K threshold, loss starts pay 2027') AS bpp_provenance,
     -- Homestead loss
     ROUND(h.homestead_fire_loss)                                  AS homestead_loss,
     h.hs_provenance                                               AS homestead_provenance,
@@ -725,6 +657,7 @@ FROM townships t
 CROSS JOIN phase_years py
 LEFT JOIN bpp b
     ON t.county_number = b.county_number AND t.township_number = b.township_number
+    AND b.phase_year = py.phase_year
 LEFT JOIN homestead h
     ON t.county_number = h.county_number AND t.township_number = h.township_number
     AND h.phase_year = py.phase_year
@@ -1022,19 +955,16 @@ district_parcel AS (
         AND LPAD(TRIM(p.state_district_number), 3, '0') = dr.tax_district_code
     WHERE p.pay_year = '2025'
 ),
--- Homestead deduction parameters (reuse from SEA1_DEDUCTION_PARAMS)
+-- Homestead deduction parameters (KAN-171: new param names, single-rate formula)
 hs_params AS (
     SELECT
         phase_year,
-        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN param_value END) AS std_ded_cap_new,
-        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN old_law_value END) AS std_ded_cap_old,
-        MAX(CASE WHEN param_name = 'STD_DED_PCT'     THEN param_value END) AS std_ded_pct,
-        MAX(CASE WHEN param_name = 'SUPP_RATE_TIER1' THEN param_value END) AS supp_r1,
-        MAX(CASE WHEN param_name = 'SUPP_THRESHOLD'  THEN param_value END) AS supp_thresh,
-        MAX(CASE WHEN param_name = 'SUPP_RATE_TIER2' THEN param_value END) AS supp_r2,
-        MAX(CASE WHEN param_name = 'STD_DED_CAP'     THEN verified END)    AS params_verified
+        MAX(CASE WHEN param_name = 'STD_DED_AMT'           THEN param_value END) AS std_ded_amt_new,
+        MAX(CASE WHEN param_name = 'SUPP_RATE'             THEN param_value END) AS supp_rate_new,
+        MAX(CASE WHEN param_name = 'SUPP_CAP_PCT_GROSS_AV' THEN param_value END) AS supp_cap_pct
     FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
     WHERE mechanism = 'HOMESTEAD'
+      AND phase_year BETWEEN 2026 AND 2031
     GROUP BY phase_year
 ),
 bkt_params AS (
@@ -1042,7 +972,7 @@ bkt_params AS (
     FROM HOOSIER_DATA.RAW.SEA1_DEDUCTION_PARAMS
     WHERE mechanism = '2PCT_BUCKET' AND param_name = 'BUCKET_DED_PCT'
 ),
--- Homestead loss per district × phase_year
+-- Homestead loss per district × phase_year (KAN-171: new formula, old-law hardcoded)
 district_homestead AS (
     SELECT
         dp.county_number,
@@ -1050,19 +980,20 @@ district_homestead AS (
         pr.phase_year,
         COUNT(*)                                                                AS homestead_parcel_count,
         ROUND(SUM(
-            (LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_new)
-                - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_old)
-            + pr.supp_r1 * LEAST(GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_new), 0), pr.supp_thresh)
-            + pr.supp_r2 * GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_new) - pr.supp_thresh, 0)
-            - pr.supp_r1 * LEAST(GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_old), 0), pr.supp_thresh)
-            - pr.supp_r2 * GREATEST(dp.homestead_av - LEAST(pr.std_ded_pct * dp.homestead_av, pr.std_ded_cap_old) - pr.supp_thresh, 0)
+            (
+                (pr.std_ded_amt_new
+                 + LEAST(GREATEST(dp.homestead_av - pr.std_ded_amt_new, 0) * pr.supp_rate_new,
+                         pr.supp_cap_pct * dp.homestead_av))
+                - (LEAST(0.60 * dp.homestead_av, 48000.0)
+                   + 0.375 * LEAST(GREATEST(dp.homestead_av - LEAST(0.60 * dp.homestead_av, 48000.0), 0), 600000.0)
+                   + 0.275 * GREATEST(dp.homestead_av - LEAST(0.60 * dp.homestead_av, 48000.0) - 600000.0, 0))
             ) * dp.fire_rate_per_100 / 100
         ), 2)                                                                   AS homestead_fire_loss,
-        CASE WHEN pr.params_verified THEN 'VERIFIED' ELSE 'ESTIMATED' END      AS hs_provenance
+        'VERIFIED'                                                              AS hs_provenance
     FROM district_parcel dp
     CROSS JOIN hs_params pr
     WHERE dp.homestead_av > 0
-    GROUP BY dp.county_number, dp.unit_code, pr.phase_year, pr.params_verified
+    GROUP BY dp.county_number, dp.unit_code, pr.phase_year
 ),
 -- 2%-bucket loss per district × phase_year
 district_two_pct AS (

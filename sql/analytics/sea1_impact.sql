@@ -249,12 +249,19 @@ WITH params AS (
     GROUP BY phase_year
 ),
 parcel_base AS (
+    -- Township-proper scoping (KAN-174): restrict to township fire districts,
+    -- matching SEA1_BPP_LOSS. City and city-annex districts (e.g. "City of
+    -- Columbus", "C-Harrison Annex") are served by a municipal fire department
+    -- and are NOT in the township fire levy base; including their homesteads
+    -- inflated the loss (Columbus homestead AV was 92.9% city, Harrison 29.9%).
     SELECT
         county_number, county_description, township_number, township_name,
         homestead_av,
         COALESCE(fire_rate_per_100, 0) AS fire_rate_per_100
     FROM HOOSIER_DATA.ANALYTICS.PARCEL_DISTRICT_RATE
     WHERE homestead_av > 0
+      AND (UPPER(tax_district_name) LIKE '%TWP%'
+           OR UPPER(tax_district_name) LIKE '%TOWNSHIP%')
 )
 SELECT
     p.county_number,
@@ -325,12 +332,17 @@ WITH bucket_params AS (
       AND param_name = 'BUCKET_DED_PCT'
 ),
 parcel_base AS (
+    -- Township-proper scoping (KAN-174): restrict to township fire districts,
+    -- matching SEA1_BPP_LOSS. Excludes city/city-annex districts not in the
+    -- township fire levy base.
     SELECT
         county_number, county_description, township_number, township_name,
         two_pct_av,
         COALESCE(fire_rate_per_100, 0) AS fire_rate_per_100
     FROM HOOSIER_DATA.ANALYTICS.PARCEL_DISTRICT_RATE
     WHERE two_pct_av > 0
+      AND (UPPER(tax_district_name) LIKE '%TWP%'
+           OR UPPER(tax_district_name) LIKE '%TOWNSHIP%')
 )
 SELECT
     p.county_number,

@@ -34,18 +34,35 @@ DEFAULT_FILE = os.path.join(REPO_ROOT, "sql", "analytics", "sea1_impact.sql")
 
 
 def extract_statement(sql_text, view_name):
-    # Strip "--" line comments first: some comments contain a ';' (e.g.
-    # "... space-padded fields;"), which would otherwise truncate the
-    # non-greedy match. No string literal in these view bodies contains '--',
-    # so this is safe; the only remaining ';' is the real statement terminator.
+    # Strip "--" line comments first: they can contain ';' or stray quotes
+    # that would confuse the terminator scan below.
     no_comments = re.sub(r"--[^\n]*", "", sql_text)
-    pat = (r"CREATE\s+OR\s+REPLACE\s+VIEW\s+HOOSIER_DATA\.ANALYTICS\."
-           + re.escape(view_name) + r"\b.*?;")
-    m = re.search(pat, no_comments, re.IGNORECASE | re.DOTALL)
+    # Locate the CREATE OR REPLACE VIEW header for this view.
+    head = re.compile(
+        r"CREATE\s+OR\s+REPLACE\s+VIEW\s+HOOSIER_DATA\.ANALYTICS\."
+        + re.escape(view_name) + r"\b", re.IGNORECASE)
+    m = head.search(no_comments)
     if not m:
         sys.exit("ERROR: could not find CREATE OR REPLACE VIEW "
                  "HOOSIER_DATA.ANALYTICS.%s in the file." % view_name)
-    return m.group(0)
+    # Scan for the terminating ';' that sits OUTSIDE any single-quoted string
+    # literal. View bodies may carry ';' inside literals (e.g. provenance_note),
+    # which a non-greedy regex would wrongly truncate on. SQL escapes a quote
+    # inside a literal by doubling it ('').
+    start, i, n = m.start(), m.end(), len(no_comments)
+    in_str = False
+    while i < n:
+        ch = no_comments[i]
+        if ch == "'":
+            if in_str and i + 1 < n and no_comments[i + 1] == "'":
+                i += 2            # escaped '' inside a string literal
+                continue
+            in_str = not in_str
+        elif ch == ";" and not in_str:
+            return no_comments[start:i + 1]
+        i += 1
+    sys.exit("ERROR: no terminating ';' found for "
+             "HOOSIER_DATA.ANALYTICS.%s (unbalanced quotes?)." % view_name)
 
 
 def main():
